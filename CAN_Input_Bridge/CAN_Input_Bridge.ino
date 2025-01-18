@@ -24,55 +24,60 @@ Frame ID: 111
 |axis5[0:7], axis5[8:15]||axis6[0:7], axis6[8:15]||xx||xx||xx||xx|
 */
 
-#include "STM32_CAN.h"
+// <> = Global library include
+// "" = local library include
 
-//TODO: inherit SPI2 buttons to report
+#include <STM32_CAN.h>
 
 /* OpenFFBoard SETUP Parameters */
-#define POLLING_FREQUENCY 1000   //HID polling frequency [Default: 1kHz]
-#define STM32_ADC_RESOLUTION 12  //Analog Input ADC Resolution (Default: 12 , STM32 ADC = 12-bit(0 to 4095)
+#define POLLING_FREQUENCY 10       //HID polling frequency [Default: 1kHz]
+#define STM32_ADC_RESOLUTION 12    //Analog Input ADC Resolution (Default: 12 , STM32 ADC = 12-bit(0 to 4095)
+#define ENABLED_ANALOG_AXIS_NUM 4  //Number of analog inputs used (Range: 0-6)
+#define ANALOG_RESOLUTION 12       // OpenFFBoard ADC = 12bit
 
-/* CAN RX/TX PINS - uncomment selection and pick based on your board*/
-//STM32_CAN Can( CAN1, DEF );  //Use PA11/12 pins for CAN1.
-//STM32_CAN Can( CAN1, ALT );  //Use PB8/9 pins for CAN1.
-STM32_CAN Can(CAN1, ALT_2);  //Use PD0/1 pins for CAN1 (OpenFFBoard-main v1.2.4 CAN_RX=PD0 | CAN_TX=PD1) 
-//STM32_CAN Can( CAN2, DEF );  //Use PB12/13 pins for CAN2.
-//STM32_CAN Can( CAN2, ALT );  //Use PB5/6 pins for CAN2
-//STM32_CAN Can( CAN3, DEF );  //Use PA8/15 pins for CAN3.
-//STM32_CAN Can( CAN3, ALT );  //Use PB3/4 pins for CAN3
+/*TODO: Replace pin mapping with HAL?
+/* ANALOG INPUT PINS (Ref:https://github.com/Ultrawipf/OpenFFBoard/wiki/Pinouts-and-peripherals) */
+uint32_t OpenFFB_Analog_Input_Pins[6] = {
+  PA3,  //OpenFFB Analog Input 1
+  PA2,  //OpenFFB Analog Input 2
+  PC3,  //OpenFFB Analog Input 3
+  PC2,  //OpenFFB Analog Input 4
+  PC1,  //OpenFFB Analog Input 5
+  PC0
+};
 
-#define CAN_SPEED 500000         // 500 kbps
-#define CAN_ANALOG_ID 110        //CAN Frame ID for Analog Input Data [Default: 110]
-#define CAN_DIGITAL_ID 100        //CAN Frame ID for Analog Input Data [Default: 100]
+//array of pin#s for enabled analog axis
+uint32_t analogPins[ENABLED_ANALOG_AXIS_NUM];
+int16_t analogAxisValues[ENABLED_ANALOG_AXIS_NUM];
 
-// Define the OpenFFBoard (STM32407VGT6) onboard DIGITAL input pins
-#define DIGITAL_PIN_1 PC15
-#define DIGITAL_PIN_2 PC14
-#define DIGITAL_PIN_3 PC13
-#define DIGITAL_PIN_4 PE6
-#define DIGITAL_PIN_5 PE5
-#define DIGITAL_PIN_6 PE4
-#define DIGITAL_PIN_7 PE3
-#define DIGITAL_PIN_8 PE2
+#define CAN_SPEED 500000   // 500 kbps
+#define CAN_ANALOG_ID 110  // CAN Frame ID for Analog Input Data [Default: 110]
+#define CAN_TXMSG_SIZE 8   // 8 Bytes
 
-/*OpenFFBoard ANALOG INPUTS:
-Up to 6 analog pins are mapped to gamepad axes with 12 bit ADC resolution.
-FFBoard pin	| STM pin
-    A0 (1)	| PA3
-    A1 (2)	| PA2
-    A2 (3)	| PC3
-    A3 (4)	| PC2
-    A4 (5)	| PC1
-    A5 (6)	| PC0
-*/
 
-#define ANALOG_PIN_1 PA3
-#define ANALOG_PIN_2 PA2
-#define ANALOG_PIN_3 PC3
-#define ANALOG_PIN_4 PC2
-#define ANALOG_PIN_5 PC1
-#define ANALOG_PIN_6 PC0
 
+
+
+
+/* Polling Variables */
+unsigned long previousMillis = 0;                                       //last time HID was polled
+const long HIDpollingDelayInMillis = ((1 / POLLING_FREQUENCY) * 1000);  //HID Polling delay in milliseconds
+
+/* CAN Settings */
+//(OpenFFBoard-main v1.2.4, Pins:CAN_RX=PD0 | CAN_TX=PD1, RX Buffer size = 8MB)
+STM32_CAN Can(CAN1, ALT_2, RX_SIZE_8, TX_SIZE_8);  //Use PD0/1 pins for CAN1 with RX/TX buffer 8MB
+
+
+//TODO: the ADC resolution may vary, should calculate bytes per axis based on resolution and initial
+const uint8_t BytesPerAxis = 2;                                                  //12bit value -> 16bit integer / 8 bits per byte = 2bytes per axis
+uint8_t FrameBytes = (ENABLED_ANALOG_AXIS_NUM * BytesPerAxis) % CAN_TXMSG_SIZE;  //how full the CAN msg is
+uint8_t CAN_msgs_per_Axis = std::ceil(FrameBytes / CAN_TXMSG_SIZE);              //how many CAN messages required per axis
+uint8_t paddingBytes = 0;
+
+
+
+//FAKE analog values for 6 axis alternating -1.000 and 1.000 readings for testing purposes
+int16_t fake_analog_values[6] = { -32767, 32767, -32767, 32767, -32767, 32767 };
 
 
 
@@ -82,19 +87,23 @@ FFBoard pin	| STM pin
 // Helper Functions:
 //===================
 
-//Analog Reading and data manipulation for HID analog inputs
-int16_t analogReadInput(uint32_t ainPin) {
-  int16_t val = (int16_t)analogRead(ainPin);
-  Serial.print("RAW Val: ");
-  Serial.print(val);
-  val = map(val, 0, 4095, -32767, 32767);  // 12bit unsigned (0 to 4095) TO 16bit signed (-32767 to +32767)
-  Serial.print(" | Mapped Val: ");
-  Serial.println(val);
-  return val;
+
+
+/*how much padding is required for the CAN msg 
+uint8_t calc_paddingBytes(uint8_t fBytes, uint8_t msgSize) {
+  if (fBytes > 0) {
+    return (msgSize - fBytes);
+  }
+  if (fBytes = 0) {
+    return fBytes;
+  } else {
+    return -1;  //ERROR
+  }
 }
+*/
 
 //Insert value into CAN Msg Buffer
-bool Append_s16(CAN_message_t *msg, int16_t val) {
+bool Append_s16(CAN_message_t* msg, int16_t val) {
   size_t start_byte = msg->len;
   if ((start_byte + 2) > 8) return false;        // can't add more data, message is full
   msg->buf[start_byte] = val & 0xFF;             // Low byte of val
@@ -103,8 +112,16 @@ bool Append_s16(CAN_message_t *msg, int16_t val) {
   return true;
 }
 
-unsigned long previousMillis = 0;       //last time HID was polled
-const long HIDpollingDelayInMillis = ((1/POLLING_FREQUENCY)*1000);  //HID Polling delay in milliseconds 
+/*Reads Analog Axis and stores into provided array*/
+int16_t readAnalogInput(uint32_t ainPin) {
+  int16_t val = (int16_t)analogRead(ainPin);
+  val = map(val, 0, 4095, -32767, 32767);  //12bit unsigned (0 to 4095) TO 16bit signed (-32767 to +32767)
+  return val;
+}
+
+
+
+
 
 
 
@@ -112,53 +129,71 @@ const long HIDpollingDelayInMillis = ((1/POLLING_FREQUENCY)*1000);  //HID Pollin
 //         SETUP         |
 //========================
 void setup() {
-  //OpenFFBoard Input Parameters
-  analogReadResolution(STM32_ADC_RESOLUTION);  //Analog Input Resolution of ADC (Default:12-bit)
-
   // Initialize serial communication for debugging
   Serial.begin(115200);
+  Serial.println("Serial initialized.");
 
   // Initialize CAN bus
   Can.begin();
   Can.setBaudRate(CAN_SPEED);
   Serial.println("CAN initialized.");
+
+  //Load array of enabled Analog Axis Pins
+  if (ENABLED_ANALOG_AXIS_NUM > 0) {
+
+    //fill analogPins array from ffboard mapping
+    for (int i = 0; i < ENABLED_ANALOG_AXIS_NUM; i++) {
+      analogPins[i] = OpenFFB_Analog_Input_Pins[i];
+    }
+    analogReadResolution(STM32_ADC_RESOLUTION);  //Analog Input Resolution of ADC (Default:12-bit)
+    //paddingBytes = calc_paddingBytes(FrameBytes, CAN_TXMSG_SIZE);
+  }
 }
 
 
-void loop() {
 
-/*HID Polling Timer*/
+void loop() {
+  /*HID Polling Timer*/
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= HIDpollingDelayInMillis) {
-    previousMillis = currentMillis; //save last time polled.
+    previousMillis = currentMillis;  //save last time polled.
 
-    CAN_message_t CAN_TX_msg;
-    CAN_TX_msg.id = (CAN_ANALOG_ID);  //Analog CAN frame id
-    CAN_TX_msg.len = 0;               //incremented as data is added to buffer
 
-    bool status;
-    status = Append_s16(&CAN_TX_msg, analogReadInput(ANALOG_PIN_1));
-    status = Append_s16(&CAN_TX_msg, analogReadInput(ANALOG_PIN_2));
-    status = Append_s16(&CAN_TX_msg, analogReadInput(ANALOG_PIN_3));
-    status = Append_s16(&CAN_TX_msg, analogReadInput(ANALOG_PIN_4));
+    //Message Counter
+    for (int j = 0; j < 2; j++) {
 
-    if (!status) {  // check to make sure buffer didn't overflow
-      Serial.println("ERROR: CAN Buffer Overflow!!");
-    }
+      CAN_message_t CAN_Msg;
+      bool status;
+      CAN_Msg.len = 0;
+      CAN_Msg.id = (CAN_ANALOG_ID + j);  //110
 
-    // Transmit Analog Inputs CAN frame
-    if (Can.write(CAN_TX_msg)) {
-      Serial.println("CAN frame sent successfully!");
-      Serial.print("Msg.len: ");
-      Serial.print(CAN_TX_msg.len);
-      Serial.print(" | Sent CAN.buf: ");
-      for (size_t i = 0; i < CAN_TX_msg.len; i++) {
-        Serial.print(CAN_TX_msg.buf[i], HEX);
-        Serial.print("|");
+      //Add Axis to the CAN buffer (4 / message)
+      for (int i = 0; i < 4; i++) {
+
+        if ((4 * j) + i <= ENABLED_ANALOG_AXIS_NUM) {
+          status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[(4 * j) + i]));
+        } else {
+          status = Append_s16(&CAN_Msg, 0);  //padding
+        }
+
+        //ERROR handling
+        if (!status) {  // check to make sure buffer didn't overflow
+          Serial.println("ERROR: CAN Buffer Overflow!!");
+        }
       }
-      Serial.println("");
-    } else {
-      Serial.println("Error sending CAN frame.");
+
+      //Send it!
+      if (Can.write(CAN_Msg)) {
+        Serial.print("CAN ID: ");
+        Serial.print(CAN_Msg.id);
+        Serial.print(" | Data: |");
+        for (int i = 0; i < 8; i++) {
+          Serial.print(CAN_Msg.buf[i], HEX);
+          Serial.print("|");
+        }
+      } else {
+        Serial.println("Error sending CAN frame.");
+      }
     }
   }
 }
