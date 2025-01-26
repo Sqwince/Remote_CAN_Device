@@ -1,43 +1,7 @@
-/*Shift register button module 74HC165 for the OpenFFBoard.
-
-Connections
-V+ - 3,3V (or 5V)
-OUT - MISO of controller
-CS (Latch) - CS pin of controller
-CLK - SCK
-GND - GND
-IN - OUT of previous module
-
-Buttons between GND and any input pin
-
-//OpenFFBoard Pinout: 
-// FFBoard	  STM pin
-// SPI2 SCK  	PB13
-// SPI2 MOSI  PB15 
-// SPI2 MISO  PB14
-// SPI2 CS1 	PB12 //main
-// SPI2 CS2	  PD8
-// SPI2 CS3	  PD8
-*/
-#include <Arduino.h>
 #include <STM32_CAN.h>
 
-#define SPI2_SCK_PIN  PB13 //Clock
-//#define SPI2_MOSI_PIN PB15 //Unused
-#define SPI2_MISO_PIN PB14 //Data In from last shift register in chain
-#define SPI2_CS_PIN   PB12 //Data Latch
-
-
-  //  bitOrder = { LSBFIRST, MSBFIRST };
-  //FastShiftIn(uint8_t dataIn, uint8_t clockPin, uint8_t bitOrder = LSBFIRST);
-FastShiftIn FSI(SPI2_MISO_PIN, SPI2_CS_PIN);
-volatile uint32_t x = 0;
-uint32_t start;
-uint32_t duration1;
-uint32_t duration2;
-
 /* OpenFFBoard SETUP Parameters */
-#define POLLING_FREQUENCY 1       //HID polling frequency [Default: 1kHz]
+#define POLLING_FREQUENCY 500       //HID polling frequency [Default: 1kHz]
 #define STM32_ADC_RESOLUTION 12    //Analog Input ADC Resolution (Default: 12 , STM32 ADC = 12-bit(0 to 4095)
 #define ENABLED_ANALOG_AXIS_NUM 6  //Number of analog inputs used (Range: 1-6)
 #define CAN_SPEED 500000   // 500 kbps
@@ -54,11 +18,6 @@ uint32_t OpenFFB_Analog_Input_Pins[6] = {
   PC1,  //OpenFFB Analog Input 5
   PC0
 };
-
-
-
-
-
 
 //array of pin#s for enabled analog axis
 uint32_t analogPins[ENABLED_ANALOG_AXIS_NUM];
@@ -89,9 +48,6 @@ int16_t readAnalogInput(uint32_t ainPin) {
   return val;
 }
 
-
-
-
 //========================
 //         SETUP         |
 //========================
@@ -105,22 +61,22 @@ void setup() {
   Can.setBaudRate(CAN_SPEED);
   Serial.println("CAN initialized.");
 
-  FSI.setBitOrder(MSBFIRST);
-
-
   //Load array of enabled Analog Axis Pins
   if (ENABLED_ANALOG_AXIS_NUM > 0) {
 
     //fill analogPins array from ffboard mapping
     for (int i = 0; i < ENABLED_ANALOG_AXIS_NUM; i++) {
       analogPins[i] = OpenFFB_Analog_Input_Pins[i];
+      pinMode(analogPins[i],INPUT);
     }
     analogReadResolution(STM32_ADC_RESOLUTION);  //Analog Input Resolution of ADC (Default:12-bit)
   }
 }
 
 
-
+//=====================
+//        LOOP        |
+//=====================
 void loop() {
   /*HID Polling Timer*/
   unsigned long currentMillis = millis();
@@ -144,13 +100,14 @@ void loop() {
       //Add Axis to the CAN buffer (4 / message)
       for (int i = 0; i < 4; i++) {
 
-        if ((4 * j) + i <= ENABLED_ANALOG_AXIS_NUM) {
+        if ((4 * j) + i < ENABLED_ANALOG_AXIS_NUM) {
           status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[(4 * j) + i]));
         }
         else {
             size_t start_byte = CAN_Msg.len;
              CAN_Msg.buf[start_byte] = 0;
-             CAN_Msg.len++;
+             CAN_Msg.buf[start_byte+1] = 0;
+             CAN_Msg.len+= 2;
         }
 
 
@@ -173,6 +130,8 @@ void loop() {
       } else {
         Serial.println("Error sending CAN frame.");
       }
+      delay(500);
+
     }
   }
 }
