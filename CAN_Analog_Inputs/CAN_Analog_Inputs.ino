@@ -3,7 +3,7 @@
 /* OpenFFBoard SETUP Parameters */
 #define POLLING_FREQUENCY 500      //HID polling frequency [Default: 1kHz]
 #define STM32_ADC_RESOLUTION 12    //Analog Input ADC Resolution (Default: 12 , STM32 ADC = 12-bit(0 to 4095)
-#define ENABLED_ANALOG_AXIS_NUM 4  //Number of analog inputs used (Range: 1-6)
+#define ENABLED_ANALOG_AXIS_NUM 6  //Number of analog inputs used (Range: 1-6)
 #define CAN_SPEED 500000           // 500 kbps
 #define CAN_ANALOG_ID 110          // CAN Frame ID for Analog Input Data [Default: 110]
 #define CAN_TXMSG_SIZE 8           // 8 Bytes
