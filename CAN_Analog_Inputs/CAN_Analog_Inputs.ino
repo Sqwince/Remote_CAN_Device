@@ -1,12 +1,12 @@
 #include <STM32_CAN.h>
 
 /* OpenFFBoard SETUP Parameters */
-#define POLLING_FREQUENCY 500       //HID polling frequency [Default: 1kHz]
+#define POLLING_FREQUENCY 500      //HID polling frequency [Default: 1kHz]
 #define STM32_ADC_RESOLUTION 12    //Analog Input ADC Resolution (Default: 12 , STM32 ADC = 12-bit(0 to 4095)
-#define ENABLED_ANALOG_AXIS_NUM 6  //Number of analog inputs used (Range: 1-6)
-#define CAN_SPEED 500000   // 500 kbps
-#define CAN_ANALOG_ID 110  // CAN Frame ID for Analog Input Data [Default: 110]
-#define CAN_TXMSG_SIZE 8   // 8 Bytes
+#define ENABLED_ANALOG_AXIS_NUM 4  //Number of analog inputs used (Range: 1-6)
+#define CAN_SPEED 500000           // 500 kbps
+#define CAN_ANALOG_ID 110          // CAN Frame ID for Analog Input Data [Default: 110]
+#define CAN_TXMSG_SIZE 8           // 8 Bytes
 
 /*TODO: Replace pin mapping with HAL?
 /* ANALOG INPUT PINS (Ref:https://github.com/Ultrawipf/OpenFFBoard/wiki/Pinouts-and-peripherals) */
@@ -44,6 +44,8 @@ bool Append_s16(CAN_message_t* msg, int16_t val) {
 /*Reads Analog Axis and stores into provided array*/
 int16_t readAnalogInput(uint32_t ainPin) {
   int16_t val = (int16_t)analogRead(ainPin);
+  
+  //TODO: refactor to use standard math over the map function
   val = map(val, 0, 4095, -32767, 32767);  //12bit unsigned (0 to 4095) TO 16bit signed (-32767 to +32767)
   return val;
 }
@@ -67,7 +69,7 @@ void setup() {
     //fill analogPins array from ffboard mapping
     for (int i = 0; i < ENABLED_ANALOG_AXIS_NUM; i++) {
       analogPins[i] = OpenFFB_Analog_Input_Pins[i];
-      pinMode(analogPins[i],INPUT);
+      pinMode(analogPins[i], INPUT_ANALOG);
     }
     analogReadResolution(STM32_ADC_RESOLUTION);  //Analog Input Resolution of ADC (Default:12-bit)
   }
@@ -82,16 +84,9 @@ void loop() {
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= HIDpollingDelayInMillis) {
     previousMillis = currentMillis;  //save last time polled.
-    
-    //int16_t analogAxisValues[ENABLED_ANALOG_AXIS_NUM];
-    //for (int i=0; i<ENABLED_ANALOG_AXIS_NUM)
-
-
-
 
     //Message Counter
     for (int j = 0; j < 2; j++) {
-
       CAN_message_t CAN_Msg;
       bool status;
       CAN_Msg.len = 0;
@@ -99,15 +94,15 @@ void loop() {
 
       //Add Axis to the CAN buffer (4 / message)
       for (int i = 0; i < 4; i++) {
-
-        if ((4 * j) + i < ENABLED_ANALOG_AXIS_NUM) {
-          status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[(4 * j) + i]));
-        }
-        else {
-            size_t start_byte = CAN_Msg.len;
-             CAN_Msg.buf[start_byte] = 0;
-             CAN_Msg.buf[start_byte+1] = 0;
-             CAN_Msg.len+= 2;
+        int axisIndex = (4 * j) + i;
+        if (axisIndex < ENABLED_ANALOG_AXIS_NUM) {
+          status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[axisIndex]));
+        } else {
+          size_t start_byte = CAN_Msg.len;
+          status = Append_s16(&CAN_Msg, 0);
+          //  CAN_Msg.buf[start_byte] = 0;
+          //  CAN_Msg.buf[start_byte+1] = 0;
+          //  CAN_Msg.len+= 2;
         }
 
 
@@ -122,16 +117,15 @@ void loop() {
         Serial.print("CAN ID: ");
         Serial.print(CAN_Msg.id);
         Serial.print(" | Data: |");
-        for (int i = 0; i < 8; i++) {
-          Serial.print(CAN_Msg.buf[i], HEX);
-          Serial.print("|");
-        }
-        Serial.println("");
+          for (int i = 0; i < 8; i++) {
+            Serial.print(CAN_Msg.buf[i], HEX);
+            Serial.print("|");
+          }
+          Serial.println("");
       } else {
         Serial.println("Error sending CAN frame.");
       }
-      delay(500);
-
+      delay(1);
     }
   }
 }
