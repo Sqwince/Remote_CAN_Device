@@ -144,6 +144,10 @@ void setup() {
 //=====================
 void loop() {
 
+    static int FrameIndex = 0; // Keeps track of the current frame
+    FrameIndex = (FrameIndex + 1) % 3; // Cycle through 0, 1, 2
+
+
   /*Input Polling Timer*/
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= CAN_Frame_interval) {
