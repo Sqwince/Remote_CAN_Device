@@ -1,22 +1,24 @@
 /*OpenFFboard External Input Controller
 ========================================
 Description: Reads Analog & Digital inputs 
-and reports status over CAN to OpenFFBoard-Main
+and reports states over CAN to OpenFFBoard-Main
+which hosts the motor driver and single interface
+to the PC.
 
-OpenFFBoarD CAN Input Protocol:
+GENERAL OPENFFB CAN PARAMETERS:
 BAUD: 500k
 Packet Size: 8 bytes
 
-Digital Input CAN FRAME:
-------------------------
+DIGITAL INPUT CAN FRAME:
+#########################
 ID: 100
 Each bit = 1 digital I/O
 32 of 64 possible mapped below in one CAN Frame:
    |11111111|11111111|11111111|11111111|
    |xxxxxxxx|xxxxxxxx|xxxxxxxx|xxxxxxxx|
 
-Analog Input CAN Frame:
-------------------------
+ANALOG INPUT CAN FRAME:
+#######################
 HID expects signed integer range (MIN:-32767[0x7fff],CENTER:0[0x0000], MAX:+32767[0x8001])
 
 Frame ID: 110
@@ -30,7 +32,7 @@ Frame ID: 111
 #include "STM32_CAN.h"  //https://github.com/pazi88/STM32_CAN
 
 /*#######   GENERAL SETUP Parameters   #######*/
-#define POLLING_FREQUENCY 120  //HID polling frequency [Default: 120Hz]
+#define POLLING_FREQUENCY 3  //HID polling frequency [Default: 120Hz]
 #define CAN_SPEED 500000       // 500 kbps
 #define CAN_TXMSG_SIZE 8       // 8 Bytes
 
@@ -38,19 +40,13 @@ Frame ID: 111
 /*#########################################*/
 /*#######   ANALOG INPUT SETTINGS   #######*/
 /*#########################################*/
-#define ENABLED_ANALOG_AXIS_NUM 6          //Number of analog inputs used (Range: 1-6)
-#define CAN_AXIS14_ID 110                  //CAN Frame ID for Analog Input Data Axis1:4 [Default: 110]
-#define CAN_AXIS56_ID (CAN_AXIS14_ID + 1)  //CAN Frame ID for Analog Input Data Axis5:6 [Default: 111]
-#define STM32_ADC_RESOLUTION 12            //Analog Input ADC Resolution (Default: 12 , STM32 ADC = 12-bit(0 to 4095)
-// #if (ENABLED_ANALOG_AXIS_NUM > 0)
-// #define ANALOG_INPUTS_ENABLED true
-// #else
-// #define ANALOG_INPUTS_ENABLED false
-// #endif
-int analogFrames = 0;                          //Number of Analog Frames reuired (0-2)
+#define ENABLED_ANALOG_AXIS_NUM 6              //Number of analog inputs used (Range: 1-6)
+#define CAN_AXIS14_ID 110                      //CAN Frame ID for Analog Input Data Axis1:4 [Default: 110]
+#define CAN_AXIS56_ID (CAN_AXIS14_ID + 1)      //CAN Frame ID for Analog Input Data Axis5:6 [Default: 111]
+#define STM32_ADC_RESOLUTION 12                //Analog Input ADC Resolution (Default: 12 , STM32 ADC = 12-bit(0 to 4095)
 uint32_t analogPins[ENABLED_ANALOG_AXIS_NUM];  //array of pin#s for enabled analog axis
 
-/* ANALOG INPUT PINS */
+//TODO: Convert this to enum?
 uint32_t OpenFFB_Analog_Input_Pins[6] = {
   PA3,  //OpenFFB Analog Input 1
   PA2,  //OpenFFB Analog Input 2
@@ -59,6 +55,14 @@ uint32_t OpenFFB_Analog_Input_Pins[6] = {
   PC1,  //OpenFFB Analog Input 5
   PC0   //OpenFFB Analog Input 6
 };      //Ref:https://github.com/Ultrawipf/OpenFFBoard/wiki/Pinouts-and-peripherals)
+
+enum ERROR_Code {
+  errorCode_Index_Fault,       //"ERROR: INPUT number out of bounds."
+  errorCode_CAN_Buf_Overflow,  //"ERROR: CAN Buffer Overflow!!"
+  errorCode_CAN_Send_Fail,     //"ERROR: Sending CAN frame failed."
+};
+
+
 
 
 
@@ -82,19 +86,21 @@ bool DIGITAL_INPUTS_ENABLED = false;
 //(OpenFFBoard-main v1.2.4, Pins:CAN_RX=PD0 | CAN_TX=PD1, RX Buffer size = 8MB)
 STM32_CAN Can(CAN1, ALT_2, RX_SIZE_8, TX_SIZE_8);  //Use PD0/1 pins for CAN1 with RX/TX buffer 8MB
 ShiftIn<SPI_BUTTON_BOARDS * 4> shift;              //Init SPI ShiftIn instance with 4x 74HC165 = 32 inputs
-uint8_t FrameIndex = 0;                            //For which CAN Frame to send (0:Digital 1:64[100], 1:Analog 1:4[110], 2:Analog 5:6[111])
-uint8_t CAN_Frame_interval;                        //Time in ms between sending CAN Frames
+uint8_t CAN_Frame_interval = 8;                    //Time in ms between sending CAN Frames
 uint8_t FrameCount = 0;                            //Number of CAN Frames enabled
+uint8_t FrameIndex = 0;                            // Keeps track of the current frame
 unsigned long previousMillis = 0;                  //last time inputs were read
 
+enum FrameIndexNumber {
+  digitalInputs,
+  AnalogAxis14,
+  AnalogAxis56,
+};
 
 
-
-
-
-//========================
-//         SETUP         |
-//========================
+/*###############################################*/
+/*#######              SETUP              #######*/
+/*###############################################*/
 void setup() {
   // Initialize serial communication for debugging
   Serial.begin(115200);
@@ -105,20 +111,16 @@ void setup() {
   Can.setBaudRate(CAN_SPEED);
   Serial.println("CAN initialized.");
 
-
-
   /* INIIALIZE DIGITAL INPUTS */
   if (SPI_BUTTON_BOARDS > 0) {
     DIGITAL_INPUTS_ENABLED = true;
-    FrameCount++;  // 1 frame used for all digital Buttons
+    FrameCount++;  //Single frame is used for up to 64 digital Buttons
   }
-
-
 
   /* INITIALIZE ANALOG INPUTS */
   if (ENABLED_ANALOG_AXIS_NUM > 0) {
-    //Calculated how many Analog CAN frames required (1 or 2)
-    analogFrames = (((ENABLED_ANALOG_AXIS_NUM + 4) - 1) / 4);
+    //Add Analog CAN frames required (1-2)
+    FrameCount += (((ENABLED_ANALOG_AXIS_NUM + 4) - 1) / 4);
 
     //Load array of enabled Analog Axis Pins
     for (int i = 0; i < ENABLED_ANALOG_AXIS_NUM; i++) {
@@ -127,89 +129,130 @@ void setup() {
     }
     //Analog Input Resolution of ADC (Default:12-bit)
     analogReadResolution(STM32_ADC_RESOLUTION);
+
+    //Error handling
+    if (FrameCount == 0 || FrameCount > 3) {
+      errorHandling(errorCode_Index_Fault);
+      while (true) {}  //No point in going any further
+    }
   }
 
-
   /* Timing */
-
-  //TIme between Polls in ms = (1/120Hz * 1000ms/sec) / FrameCount
-
+  //Time between each CAN Frame in ms = (1/120Hz * 1000ms/sec) / (1,2,3)
   CAN_Frame_interval = (((1 / POLLING_FREQUENCY) * 1000) / (FrameCount));
-  //const long HIDpollingDelayInMillis = (((1 / POLLING_FREQUENCY) * 1000)/CAN_Frame_interval;  //HID Polling delay in milliseconds
 }
 
 
-//=====================
-//        LOOP        |
-//=====================
+
+
+
+/*###############################################*/
+/*#######               LOOP              #######*/
+/*###############################################*/
 void loop() {
-
-    static int FrameIndex = 0; // Keeps track of the current frame
-    FrameIndex = (FrameIndex + 1) % 3; // Cycle through 0, 1, 2
-
-
   /*Input Polling Timer*/
   unsigned long currentMillis = millis();
+
+
   if (currentMillis - previousMillis >= CAN_Frame_interval) {
     previousMillis = currentMillis;  //save last time polled.
 
+    /* Frame interval delay:
+     Frames | Duration [ms]
+          1 = 8ms
+          2 = 4ms
+          3 = 2ms         */
+    FrameIndex = (FrameIndex + 1) % FrameCount;  //Cycles through 0, 1, 2 (depending on how many frames needed)
 
 
-
+    CAN_message_t CAN_Msg;
+    bool status;
 
 
     //For which CAN Frame to send (0:Digital 1:64[100], 1:Analog 1:4[110], 2:Analog 5:6[111])
     switch (FrameIndex) {
-      /* SEND DIGITAL BUTTON DATA*/
-      case 0:
+      case digitalInputs:  // SEND DIGITAL BUTTON DATA
         {
           if (DIGITAL_INPUTS_ENABLED) {
-            CAN_message_t CAN_Msg;
-            bool status;
             CAN_Msg.len = 0;
             CAN_Msg.id = (CAN_DIGITAL_ID);
+
+            //Load Digital Inputs into CAN Buffer
+            status = Append_BTN_States(&CAN_Msg, &shift);
+
+            //ERROR handling
+            if (!status) { errorHandling(errorCode_CAN_Buf_Overflow); }
+            break;  //SPECIAL CASE: If no digital pins used, will overflow to next case.
           }
+        }
 
-
-          break;
-        }  //END CASE 0
-      /* SEND ANALOG AXIS 1:4 DATA*/
-      case 1:  // your hand is on the sensor
+      /*#######################################################################*/
+      case AnalogAxis14:  // SEND ANALOG AXIS 1:4 DATA
         {
-         if (ANALOG_INPUTS_ENABLED) {
-          CAN_message_t CAN_Msg;
-          bool status;
           CAN_Msg.len = 0;
           CAN_Msg.id = (CAN_AXIS14_ID);
+          //Load ANALOG Inputs AXIS1:4 into CAN Buffer
 
 
+          // //Add Axis to the CAN buffer (4 / message)
+          for (int i = 0; i < 4; i++) {
+            if ( i < ENABLED_ANALOG_AXIS_NUM) {
+              status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[i]));
+            } else {
+              size_t start_byte = CAN_Msg.len;  //pad frame with zeros  
+              status = Append_s16(&CAN_Msg, 0); //TODO: Test without padding. (New Openffboard FW may render this OBE)
+            }
+          }
+
+          //ERROR handling
+          if (!status) { errorHandling(errorCode_CAN_Buf_Overflow); }  // check to make sure buffer didn't overflow
           break;
-        }  //END CASE 1
+        }
 
-      /* SEND ANALOG AXIS 5:6 DATA*/
-      case 2:  // your hand is on the sensor
+      /*#######################################################################*/
+      case AnalogAxis56:  // SEND ANALOG AXIS 1:4 DATA
         {
-          CAN_message_t CAN_Msg;
-          bool status;
           CAN_Msg.len = 0;
           CAN_Msg.id = (CAN_AXIS56_ID);
+          //Load ANALOG Inputs AXIS5:6 into CAN Buffer
 
+          // //Add Axis to the CAN buffer (4 / message)
+          for (int i = 4; i < 8; i++) {
 
+            if ((i+4) < ENABLED_ANALOG_AXIS_NUM) {
+              status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[i]));
+            } else {
+              size_t start_byte = CAN_Msg.len;  //pad frame with zeros  
+              status = Append_s16(&CAN_Msg, 0); //TODO: Test without padding. (New Openffboard FW may render this OBE)
+            }
+          }
+
+          //ERROR handling
+          if (!status) { errorHandling(errorCode_CAN_Buf_Overflow); }  // check to make sure buffer didn't overflow
           break;
-        }  //END CASE 2
+        }
+    }
+
+    //Just gonna send it!!! (https://www.youtube.com/watch?v=RSuLFvalhnQ)
+    if (Can.write(CAN_Msg)) {
+      Serial.print("CAN ID: ");
+      Serial.print(CAN_Msg.id);
+      Serial.print(" | Data: |");
+      for (int i = 0; i < CAN_Msg.len; i++) {
+        Serial.print(CAN_Msg.buf[i], HEX);
+        Serial.print("|");
+      }
+      Serial.println("");
+    } else {
+      errorHandling(errorCode_CAN_Send_Fail);
     }
   }
-
-  //Frame Index increment
-  if ()
 }
 
 
-
-
-//===================
-// Helper Functions:
-//===================
+/*###############################################*/
+/*#######          HELPER FUNCTIONS       #######*/
+/*###############################################*/
 
 //Insert value into CAN Msg Buffer
 bool Append_s16(CAN_message_t* msg, int16_t val) {
@@ -226,11 +269,75 @@ int16_t readAnalogInput(uint32_t ainPin) {
   int16_t val = (int16_t)analogRead(ainPin);
 
   //TODO: refactor to use standard math over the map function
-  val = map(val, 0, 4095, -32767, 32767);  //12bit unsigned (0 to 4095) TO 16bit signed (-32767 to +32767)
+  //val = map(val, 0, 4095, -32767, 32767);
+  /* 
+  Refactor without using the map function
+    mapped_val=(input_value−in_min)× (out_max−out_min/in_max−in_min)+out_min
+      val = ((int32_t)val - in_min) * ((out_max - out_min) / (in_max - in_min)) + out_min;
+    in_min = 0
+    in_max = 4095
+    out_min = -32767
+    out_max = 32767
+  */
+
+  //12bit unsigned (0 to 4095) TO 16bit signed (-32767 to +32767)
+  val = ((int32_t)val * 65534 / 4095) - 32767;  // Scale and shift to the desired range
   return val;
 }
 
+//Insert value into CAN Msg Buffer
+//|xxxxxxxx|xxxxxxxx|xxxxxxxx|xxxxxxxx|00000000|00000000|00000000|00000001
+template<uint8_t N>
+bool Append_BTN_States(CAN_message_t* _msg, ShiftIn<N>* _shift) {
+  uint64_t val = _shift->read();  // Read button values as 64-bit integer
 
+  Serial.print("Val:");
+  Serial.println(val, HEX);
+
+  // Check to ensure the message buffer is empty and can fit 8 bytes
+  if (_msg->len != 0) {
+    return false;
+  }
+
+  for (int i = 0; i < 8; i++) {
+    _msg->buf[i] = val & 0xFF;  // Extract the lowest byte
+    val >>= 8;                  // Shift val right by 8 bits
+    _msg->len++;                // Increment the length for each byte added
+  }
+  return true;
+}
+
+
+
+
+
+
+
+
+
+/*###############################################*/
+/*#######          ERROR HANDLING         #######*/
+/*###############################################*/
+
+void errorHandling(ERROR_Code errorCode) {
+  switch (errorCode) {
+    case errorCode_Index_Fault:
+      {
+        Serial.println("ERROR: INPUT number out of bounds.");
+        break;
+      }
+    case errorCode_CAN_Buf_Overflow:
+      {
+        Serial.println("ERROR: CAN Buffer Overflow!!");
+        break;
+      }
+    case errorCode_CAN_Send_Fail:
+      {
+        Serial.println("ERROR: Sending CAN frame failed.");
+        break;
+      }
+  }
+}
 
 
 
@@ -254,56 +361,7 @@ int16_t readAnalogInput(uint32_t ainPin) {
           //  CAN_Msg.buf[start_byte] = 0;
           //  CAN_Msg.buf[start_byte+1] = 0;
           //  CAN_Msg.len+= 2;
-        }
-
-
-        //ERROR handling
-        if (!status) {  // check to make sure buffer didn't overflow
-          Serial.println("ERROR: CAN Buffer Overflow!!");
-        }
+        }       
       }
-
-      //Send it!
-      if (Can.write(CAN_Msg)) {
-        Serial.print("CAN ID: ");
-        Serial.print(CAN_Msg.id);
-        Serial.print(" | Data: |");
-        for (int i = 0; i < 8; i++) {
-          Serial.print(CAN_Msg.buf[i], HEX);
-          Serial.print("|");
-        }
-        Serial.println("");
-      } else {
-        Serial.println("Error sending CAN frame.");
-      }
-      delay(1);
     }
-  }
-}
-
-/* Reference Information*/
-/*OpenFFboard External CAN Input monitor
-======================================
-Description: Reads Digital and Analog I/O and reports status over CAN to OpenFFBoard-Main
-
-OpenFFBoarD CAN Input Protocol:
-BAUD: 500k
-Packet Size: 8 bytes
-
-Digital Input CAN FRAME:
-------------------------
-ID: 100
-Each bit = 1 digital I/O
-32 of 64 possible mapped below in one CAN Frame:
-   |11111111|11111111|11111111|11111111|
-   |xxxxxxxx|xxxxxxxx|xxxxxxxx|xxxxxxxx|
-
-Analog Input CAN Frame:
-------------------------
-HID expects signed integer range (MIN:-32767[0x7fff],CENTER:0[0x0000], MAX:+32767[0x8001])
-
-Frame ID: 110
-|axis1[0:7], axis1[8:15]||axis2[0:7], axis2[8:15]||axis3[0:7], axis3[8:15]||axis4[0:7], axis4[8:15]||
-Frame ID: 111
-|axis5[0:7], axis5[8:15]||axis6[0:7], axis6[8:15]||xx||xx||xx||xx|
 */
