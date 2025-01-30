@@ -31,12 +31,6 @@ Frame ID: 111
 #include "ShiftIn.h"    //https://github.com/InfectedBytes/ArduinoShiftIn
 #include "STM32_CAN.h"  //https://github.com/pazi88/STM32_CAN
 
-/*#######   GENERAL SETUP Parameters   #######*/
-#define POLLING_FREQUENCY 3  //HID polling frequency [Default: 120Hz]
-#define CAN_SPEED 500000       // 500 kbps
-#define CAN_TXMSG_SIZE 8       // 8 Bytes
-
-
 /*#########################################*/
 /*#######   ANALOG INPUT SETTINGS   #######*/
 /*#########################################*/
@@ -62,10 +56,6 @@ enum ERROR_Code {
   errorCode_CAN_Send_Fail,     //"ERROR: Sending CAN frame failed."
 };
 
-
-
-
-
 /*##########################################*/
 /*#######   DIGITAL INPUT SETTINGS   #######*/
 /*##########################################*/
@@ -83,6 +73,12 @@ bool DIGITAL_INPUTS_ENABLED = false;
 /*###############################################*/
 /*#######   General & Timing Parameters   #######*/
 /*###############################################*/
+#define POLLING_FREQUENCY 1  //Input polling frequency [Default: 120Hz]
+#define CAN_SPEED 500000     //500 kbps
+#define CAN_TXMSG_SIZE 8     //8 Bytes
+#define DEBUG_ENABLED 1      //serial print debug msgs
+
+
 //(OpenFFBoard-main v1.2.4, Pins:CAN_RX=PD0 | CAN_TX=PD1, RX Buffer size = 8MB)
 STM32_CAN Can(CAN1, ALT_2, RX_SIZE_8, TX_SIZE_8);  //Use PD0/1 pins for CAN1 with RX/TX buffer 8MB
 ShiftIn<SPI_BUTTON_BOARDS * 4> shift;              //Init SPI ShiftIn instance with 4x 74HC165 = 32 inputs
@@ -102,14 +98,18 @@ enum FrameIndexNumber {
 /*#######              SETUP              #######*/
 /*###############################################*/
 void setup() {
-  // Initialize serial communication for debugging
+// Initialize serial communication for debugging
+#if defined(DEBUG_ENABLED)
   Serial.begin(115200);
   Serial.println("Serial initialized.");
+#endif
 
   // Initialize CAN bus
   Can.begin();
   Can.setBaudRate(CAN_SPEED);
+#if defined(DEBUG_ENABLED)
   Serial.println("CAN initialized.");
+#endif
 
   /* INIIALIZE DIGITAL INPUTS */
   if (SPI_BUTTON_BOARDS > 0) {
@@ -196,11 +196,11 @@ void loop() {
 
           // //Add Axis to the CAN buffer (4 / message)
           for (int i = 0; i < 4; i++) {
-            if ( i < ENABLED_ANALOG_AXIS_NUM) {
+            if (i < ENABLED_ANALOG_AXIS_NUM) {
               status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[i]));
             } else {
-              size_t start_byte = CAN_Msg.len;  //pad frame with zeros  
-              status = Append_s16(&CAN_Msg, 0); //TODO: Test without padding. (New Openffboard FW may render this OBE)
+              size_t start_byte = CAN_Msg.len;   //pad frame with zeros
+              status = Append_s16(&CAN_Msg, 0);  //TODO: Test without padding. (New Openffboard FW may render this OBE)
             }
           }
 
@@ -219,11 +219,11 @@ void loop() {
           // //Add Axis to the CAN buffer (4 / message)
           for (int i = 4; i < 8; i++) {
 
-            if ((i+4) < ENABLED_ANALOG_AXIS_NUM) {
+            if ((i + 4) < ENABLED_ANALOG_AXIS_NUM) {
               status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[i]));
             } else {
-              size_t start_byte = CAN_Msg.len;  //pad frame with zeros  
-              status = Append_s16(&CAN_Msg, 0); //TODO: Test without padding. (New Openffboard FW may render this OBE)
+              size_t start_byte = CAN_Msg.len;   //pad frame with zeros
+              status = Append_s16(&CAN_Msg, 0);  //TODO: Test without padding. (New Openffboard FW may render this OBE)
             }
           }
 
@@ -320,6 +320,10 @@ bool Append_BTN_States(CAN_message_t* _msg, ShiftIn<N>* _shift) {
 /*###############################################*/
 
 void errorHandling(ERROR_Code errorCode) {
+
+//TODO: Blink red ERROR Light
+
+#if defined(DEBUG_ENABLED)
   switch (errorCode) {
     case errorCode_Index_Fault:
       {
@@ -337,6 +341,7 @@ void errorHandling(ERROR_Code errorCode) {
         break;
       }
   }
+#endif
 }
 
 
