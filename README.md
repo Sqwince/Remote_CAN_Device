@@ -1,7 +1,7 @@
-# CAN_INPUT_BRIDGE
+#External_Input_Controller
 Input hub for OpenFFBoard (STM32) that re-transmits button and analog inputs over CAN (4-wire)
 
-The CAN_INPUT_BRIDGE was developed to work with the OpenFFBoard-hardware. 
+The External_Input_Controller was developed to work with the OpenFFBoard-hardware. 
 
 
 For Reference:
