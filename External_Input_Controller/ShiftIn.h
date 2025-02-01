@@ -60,21 +60,21 @@ public:
 	inline void setPulseWidth(uint8_t value) { pulseWidth = value; }
 	inline uint16_t getDataWidth() { return dataWidth; }
 	// whether some value has changed
-	inline boolean hasChanged() { return lastState != currentState; }
+	inline bool hasChanged() { return lastState != currentState; }
 	// whether the value with index 'id' has changed
-	inline boolean hasChanged(int id) { return state(id) != last(id); }
+	inline bool hasChanged(int id) { return state(id) != last(id); }
 	// returns the state from the last frame
 	inline ShiftType getLast() { return lastState; }
 	// returns the current state
 	inline ShiftType getCurrent() { return currentState; }
 	// whether button 'id' is pressed or not
-	inline boolean state(int id) { return bitRead(currentState, id); }
+	inline bool state(int id) { return bitRead(currentState, id); }
 	// whether button 'id' was pressed in the last frame
-	inline boolean last(int id) { return bitRead(lastState, id); }
+	inline bool last(int id) { return bitRead(lastState, id); }
 	// whether button 'id' is now pressed, but wasn't pressed in the last frame
-	inline boolean pressed(int id) { return !last(id) && state(id); }
+	inline bool pressed(int id) { return !last(id) && state(id); }
 	// whether button 'id' is now released, but was pressed in the last frame
-	inline boolean released(int id) { return last(id) && !state(id); }
+	inline bool released(int id) { return last(id) && !state(id); }
 	
 	// read in data from shift register and return the new value
 	ShiftType read() {
@@ -99,7 +99,7 @@ public:
 	}
 	
 	// same as read, but it returns whether something has changed or not
-	boolean update() {
+	bool update() {
 		return read() != lastState;
 	}
 };

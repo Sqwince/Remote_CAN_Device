@@ -6,12 +6,6 @@
 /*#########################################*/
 /*#######           ENUMS           #######*/
 /*#########################################*/
-enum ERROR_Code {
-  errorCode_Index_Fault,       //"ERROR: INPUT number out of bounds."
-  errorCode_CAN_Buf_Overflow,  //"ERROR: CAN Buffer Overflow!!"
-  errorCode_CAN_Send_Fail,     //"ERROR: Sending CAN frame failed."
-};
-
 enum FrameIndexNumber {
   digitalInputs,
   AnalogAxis14,
@@ -42,7 +36,6 @@ uint32_t OpenFFB_Analog_Input_Pins[6] = {
 #define CAN_AXIS56_ID (CAN_AXIS14_ID + 1)      //CAN Frame ID for Analog Input Data Axis5:6 [Default: 111]
 #define STM32_ADC_RESOLUTION 12                //Analog Input ADC Resolution (Default: 12 , STM32 ADC = 12-bit(0 to 4095)
 uint32_t analogPins[ENABLED_ANALOG_AXIS_NUM];  //array of pin#s for enabled analog axis
-
 
 
 /*##########################################*/

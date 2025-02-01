@@ -32,14 +32,17 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
-#include "Config.h"
 #include <Arduino.h>
+#include "Config.h"
 #include "ShiftIn.h"    //https://github.com/InfectedBytes/ArduinoShiftIn
 #include "STM32_CAN.h"  //https://github.com/pazi88/STM32_CAN
+#include "Error_Handler.h"
+
 
 //(OpenFFBoard-main v1.2.4, Pins:CAN_RX=PD0 | CAN_TX=PD1, RX Buffer size = 8MB)
-STM32_CAN Can(CAN1, ALT_2, RX_SIZE_8, TX_SIZE_8);  //Use PD0/1 pins for CAN1 with RX/TX buffer 8MB
-ShiftIn<(SPI_BUTTON_BOARDS * 4)> shift;            //Init SPI ShiftIn instance with 4x 74HC165 = 32 inputs
+STM32_CAN Can(CAN1, ALT_2, RX_SIZE_8, TX_SIZE_8);      //Use PD0/1 pins for CAN1 with RX/TX buffer 8MB
+ShiftIn<(SPI_BUTTON_BOARDS * 4)> shift;                //Init SPI ShiftIn instance with 4x 74HC165 = 32 inputs
+ErrorHandler error_handler(LED_RED_Pin,DEBUG_ENABLED); //Init Error handler (Serial Debugging & onboard RED LED)
 
 /*###############################################*/
 /*#######              SETUP              #######*/
@@ -53,7 +56,7 @@ void setup() {
 
   //blinky blinky
   pinMode(LED_BLU_Pin, OUTPUT);
-  pinMode(LED_RED_Pin, OUTPUT);
+//  pinMode(LED_RED_Pin, OUTPUT); //Moved to the error handler
   pinMode(LED_YEL_Pin, OUTPUT);
 
   // Initialize CAN bus
@@ -87,7 +90,7 @@ void setup() {
 
     //Error handling
     if (FrameCount == 0 || FrameCount > 3) {
-      errorHandling(errorCode_Index_Fault);
+      error_handler.handleError(errorCode_Index_Fault);
       while (true) {}  //No point in going any further
     }
   }
@@ -125,9 +128,9 @@ void loop() {
 
             //ERROR handling
             if (!status) {
-              errorHandling(errorCode_CAN_Buf_Overflow);
+              error_handler.handleError(errorCode_CAN_Buf_Overflow);
             } else {
-              errorClear();
+              error_handler.clearError();
             }
             break;  //SPECIAL CASE: If no digital pins used, will overflow to next case.
           }
@@ -150,9 +153,9 @@ void loop() {
           }
 
           //ERROR handling
-          if (!status) { errorHandling(errorCode_CAN_Buf_Overflow); }  // check to make sure buffer didn't overflow
+          if (!status) { error_handler.handleError(errorCode_CAN_Buf_Overflow); }  // check to make sure buffer didn't overflow
           else {
-            errorClear();
+            error_handler.clearError();
           }
           break;
         }
@@ -174,9 +177,9 @@ void loop() {
           }
 
           //ERROR handling
-          if (!status) { errorHandling(errorCode_CAN_Buf_Overflow); }  // check to make sure buffer didn't overflow
+          if (!status) { error_handler.handleError(errorCode_CAN_Buf_Overflow); }  // check to make sure buffer didn't overflow
           else {
-            errorClear();
+            error_handler.clearError();
           }
           break;
         }
@@ -193,17 +196,16 @@ void loop() {
       }
       Serial.println("");
     } else {
-      errorHandling(errorCode_CAN_Send_Fail);
+      error_handler.handleError(errorCode_CAN_Send_Fail);
     }
   }
 }
-
 
 /*###############################################*/
 /*#######          HELPER FUNCTIONS       #######*/
 /*###############################################*/
 
-//Insert value into CAN Msg Buffer
+//Insert s16b value into CAN Msg Buffer
 bool Append_s16(CAN_message_t* msg, int16_t val) {
   size_t start_byte = msg->len;
   if ((start_byte + 2) > 8) return false;        // can't add more data, message is full
@@ -242,34 +244,6 @@ bool Append_BTN_States(CAN_message_t* _msg, ShiftIn<N>* _shift) {
 }
 
 
-/*###############################################*/
-/*#######          ERROR HANDLING         #######*/
-/*###############################################*/
-void errorClear() {
-  digitalWrite(LED_RED_Pin, LOW);
-}
 
-void errorHandling(ERROR_Code errorCode) {
-  //TODO: Blink red ERROR Light
-  digitalWrite(LED_RED_Pin, HIGH);
-//Serial Debugger
-#if defined(DEBUG_ENABLED)
-  switch (errorCode) {
-    case errorCode_Index_Fault:
-      {
-        Serial.println("ERROR: INPUT number out of bounds.");
-        break;
-      }
-    case errorCode_CAN_Buf_Overflow:
-      {
-        Serial.println("ERROR: CAN Buffer Overflow!!");
-        break;
-      }
-    case errorCode_CAN_Send_Fail:
-      {
-        Serial.println("ERROR: Sending CAN frame failed.");
-        break;
-      }
-  }
-#endif
-}
+
+
