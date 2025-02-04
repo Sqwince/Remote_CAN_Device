@@ -12,17 +12,17 @@ unsigned long previousMillis = 0;                                   //last time 
 const long refreshRateDelayInMillis = ((1 / REFRESH_RATE) * 1000);  //HID Polling delay in milliseconds
 const int half_LED_Num = NUM_LEDS / 2;
 
-RPMGauge<6> rpmGauge(
-  0,            //  Arg1: Starting LED index in the strip
-  NUM_LEDS,     //  Arg2: Number of LEDs used for the gauge
-  CRGB::Green,   //  Arg3: Color at the lowest RPM
-  CRGB::Red,    //  Arg4: Color at the highest RPM
-  CRGB::Black,  //  Arg5: Default color of the LEDs
-  0,            //  Arg6: Minimum RPM value (0% level)
-  100,          //  Arg7: Maximum RPM value (100% level)
-  250,          //  Arg8: Blinking interval for redline alert
-  true,         //  Arg9: Whether to use dimming effect
-  false);       // Arg10: Direction of LED fill (true = right to left)
+RPMGauge<6> rpmGauge(    
+                  0,            //  Arg1: Starting LED index in the strip
+                  NUM_LEDS,     //  Arg2: Number of LEDs used for the gauge
+                  CRGB::Blue,   //  Arg3: Color at the lowest RPM
+                  CRGB::Red,    //  Arg4: Color at the highest RPM
+                  CRGB::Black,  //  Arg5: Default color of the LEDs
+                  0,            //  Arg6: Minimum RPM value (0% level)
+                  100,          //  Arg7: Maximum RPM value (100% level)
+                  250,          //  Arg8: Blinking interval for redline alert
+                  true,         //  Arg9: Whether to use dimming effect
+                  false);       // Arg10: Direction of LED fill (true = right to left)
 
 /*#############################################################################*/
 void setup() {
@@ -41,20 +41,14 @@ void setup() {
 /*#############################################################################*/
 
 void loop() {
-  unsigned long currentMillis = millis();
-  if (currentMillis - previousMillis >= refreshRateDelayInMillis) {
-    previousMillis = currentMillis;
-    int potValue = analogRead(POT_PIN);
-    int rpmPercentage = map(potValue, 0, 1023, 0, 100);  // Convert to percentage
-    if (DEBUG_ENABLED) {
-      Serial.print("potValue");
-      Serial.print(potValue);
-      Serial.print(" | rpmPercentage");
-      Serial.println(rpmPercentage);
+    unsigned long currentMillis = millis();
+    if (currentMillis - previousMillis >= refreshRateDelayInMillis) {
+        previousMillis = currentMillis;
+        int potValue = analogRead(POT_PIN);
+        int rpmPercentage = map(potValue, 0, 1023, 0, 100);  // Convert to percentage
+        rpmGauge.update(rpmPercentage);
+        rpmGauge.show();
     }
-    rpmGauge.update(rpmPercentage);
-    rpmGauge.show();
-  }
 }
 
 
