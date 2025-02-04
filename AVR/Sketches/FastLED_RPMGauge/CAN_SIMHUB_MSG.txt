@@ -1,0 +1,179 @@
+
+bool RPMs_redline_reached
+bool Pit_limiter
+bool IsInPitLane
+bool TurnSignal_Left
+bool TurnSignal_Right
+bool Spotter_Left
+bool Spotter_Right
+
+enum FlagStates {
+	BlackFlag
+	WhiteFlag
+	GreenFlag
+	YellowFlag
+	BlueFlag
+}
+
+CRGBPalette16 FlagColors(
+  CRGB::Black,
+  CRGB::Silver
+
+);
+
+
+
+
+
+
+enum class FlagColors : CRGB {  //FastLED Colors
+	BlackFlagColor = CRGB::Silver;
+	WhiteFlagColor - CRGB::,
+	GreenFlagColor,
+	YellowFlagColor,
+	BlueFlagColor
+}
+
+enum class StatusCode : uint8_t {  // Explicitly use uint8_t
+    SUCCESS = 0,
+    ERROR = 1,
+    WARNING = 2
+};
+
+CANID: 120
+|0*|1?|2?|3?|4?|5?|6?|7?|
+
+
+16b BITMASK (0xFFFF) = 1111 1111 1111 1111
+LEDindex = {0,1,2,3,4,5,6,7,8,9,10,11,12,13,14,15}
+
+
+//uint8_t RPMs = 0xFF  [0-255 / 0-100% ]
+msg.buf[0]: 0xFF // 100% RPMs
+                     
+msg.buf[1]: 
+msg.buf[2]:
+msg.buf[3]:
+msg.buf[4]:
+msg.buf[5]:
+msg.buf[6]:
+msg.buf[7]:
+
+
+
+
+
+
+
+
+
+
+/*SIMHUB */
+
+/*EFFECTS*/
+Class Object: "RPMs (0% To 100%)"
+1x9 RGB LED Array
+as RPM increases the number of LEDs increases to fill the gauge like the example provided. 
+below are the properties of the class that 
+would be used to setup the object constructor
+-----------------
+Start position: integer (LED Index)
+Led Count: integer
+Color: CRGB::Yellow
+Start Color: CRGB::Blue
+End Color: CRGB::Red
+Minimum RPM (%): 0%
+Maximum RPM (%): 100%
+Redline Blinking (ms): 250ms
+Use Dimming: Boolean
+RightToLeft: Booolean
+
+//Future:
+RPM Mode: % | % RL | RPM
+UseCurrentColorForAll: Boolean
+BlinkLastGear: Boolean
+
+
+
+Flasher
+--------------
+Start position: integer (LED Index)
+Led Count: integer
+Color1: CRGB::Blue
+Color2: CRGB::Red
+Pattern: Interleve | Alternate | FlashALL
+AnimationDelay: 500ms
+/*Future*/
+Clear Background: Boolean
+
+
+Static Color:
+--------------
+start position: LED index
+Led Count: integer
+Color: CRGB::Yellow
+Blink Color: CRGB::Black
+Blink Delay
+
+
+
+
+
+Transparent Color = if check don't overwrite?
+
+
+
+
+
+
+
+
+
+
+
+
+
+CUSTOM SERIAL CONSOLE nCALC FORMULAS:
+//See - C:\Program Files (x86)\SimHub\NCalcScripts for more:
+
+[Variable]
+name='blinkgear'
+value=blink('rpm',150,[DataCorePlugin.GameData.NewData.CarSettings_RPMRedLineReached]>0)
+
+[ExportLed]
+name='IsInPit'
+value=if([DataCorePlugin.GameData.NewData.IsInPit],1,0)
+
+
+
+
+
+
+
+Setup: CANID: 120 - Send parameters
+Loop: CANID: 121 -> Send Telemetry
+
+
+
+
+enum ColorPalette {
+    BLACK = 0x000000,   // 0 - Black
+    RED = 0xFF0000,     // 1 - Red
+    ORANGE = 0xFFA500,  // 2 - Orange
+    YELLOW = 0xFFFF00,  // 3 - Yellow
+    GREEN = 0x008000,   // 4 - Green
+    BLUE = 0x0000FF,    // 5 - Blue
+    INDIGO = 0x4B0082,  // 6 - Indigo
+    VIOLET = 0xEE82EE,  // 7 - Violet
+    CYAN = 0x00FFFF,    // 8 - Cyan
+    MAGENTA = 0xFF00FF, // 9 - Magenta
+    WHITE = 0xFFFFFF,   // A - White
+    GREY = 0x808080,    // B - Grey
+    PINK = 0xFFC0CB,    // C - Pink
+    BROWN = 0xA52A2A,   // D - Brown
+    GOLD = 0xFFD700,    // E - Gold
+    SILVER = 0xC0C0C0   // F - Silver
+};
+
+
+
