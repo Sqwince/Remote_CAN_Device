@@ -12,8 +12,10 @@
 unsigned long previousMillis = 0;                                   //last time HID was polled
 const long refreshRateDelayInMillis = ((1 / REFRESH_RATE) * 1000);  //HID Polling delay in milliseconds
 
-CRGB leds[NUM_LEDS];
-FastLED_Plus effects(&leds, NUM_LEDS);
+CRGB leds[NUM_LEDS];  //LED strip as array of CRGB colors for FastLED lib
+
+//WS2812B,GRB, LED_PIN, NUM_LEDS
+FastLED_Plus effects();
 
 
 

@@ -11,30 +11,42 @@ public:
 
   ~FastLED_Plus() {}  //Destructor
 
-  class RPMGauge : public FastLED_Plus {
-
     /* Creates a RPM gauge that resembles SimHub RPM Gauge Effect*/
   public:
-     drawRPMGauge(CRGB* leds,         //pointer to LED strip
-                 uint16_t startPos,  //Starting LED
-                 uint16_t ledCount,  //Number of LEDs to include in effect
-                 CRGB startColor,    //Starting Color in CRGB format
-                 CRGB endColor,      //Ending color in CRGB format
-                 uint16_t minRPM,    //minimum RPM value (Default: 0%)
-                 uint16_t maxRPM,    //maximum RPM value (Default: 100%)
-                 bool useDimming,    //fade last LED
-                 bool rightToLeft,   //animation direction
-                 //TODO: optional include redline flashing with thse optional args?
-                 CRGB redlineColor1,    //Color 1 of RPM Redline animation blink
-                 CRGB redlineColor2,    //Color 2 of PRM redline animation blink
-                 uint16_t blinkDelay);  //blink delay for redline blink animation
+    struct RPMGauge {
+                    CRGB* leds,         //pointer to LED strip
+                    uint16_t startPos,  //Starting LED
+                    uint16_t ledCount,  //Number of LEDs to include in effect
+                    CRGB startColor,    //Starting Color in CRGB format
+                    CRGB endColor,      //Ending color in CRGB format
+                    uint16_t minRPM,    //minimum RPM value (Default: 0%)
+                    uint16_t maxRPM,    //maximum RPM value (Default: 100%)
+                    bool useDimming,    //fade last LED
+                    bool rightToLeft,   //animation direction
+                    CRGB redlineColor1,    //Color 1 of RPM Redline animation blink
+                    CRGB redlineColor2,    //Color 2 of PRM redline animation blink
+                    uint16_t blinkDelay);  //blink delay for redline blink animation
+    };
+
+    RPMGauge createRPMGauge(CRGB* leds,         //pointer to LED strip
+                            uint16_t startPos,  //Starting LED
+                            uint16_t ledCount,  //Number of LEDs to include in effect
+                            CRGB startColor,    //Starting Color in CRGB format
+                            CRGB endColor,      //Ending color in CRGB format
+                            uint16_t minRPM,    //minimum RPM value (Default: 0%)
+                            uint16_t maxRPM,    //maximum RPM value (Default: 100%)
+                            bool useDimming,    //fade last LED
+                            bool rightToLeft,   //animation direction
+                            //TODO: optional include redline flashing with thse optional args?
+                            CRGB redlineColor1,  //Color 1 of RPM Redline animation blink
+                            CRGB redlineColor2,  //Color 2 of PRM redline animation blink
+                            uint16_t blinkDelay  //blink delay for redline blink animation
+    );
 
 
-//Left off here
 
 
-
-    void updateRPMGauge(uint16_t RPMs);
+    void updateRPMGauge(uint16_t RPMs, RPMGauge rpmGauge);
 
 
 
