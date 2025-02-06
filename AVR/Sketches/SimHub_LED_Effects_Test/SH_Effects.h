@@ -1,16 +1,15 @@
-#ifndef FASTLED_PLUS_H
-#define FASTLED_PLUS_H
+#ifndef SH_EFFECTS_H
+#define SH_EFFECTS_H
 
 #include <FastLED.h>
 
-class FastLED_Plus {
+class SH_Effects {
 public:
-  FastLED_Plus();   //Constructor
+  // SH_Effects();   //Constructor
+  // ~SH_Effects();  //Destructor
 
-  ~FastLED_Plus();  //Destructor
-
-  /* Creates a RPM gauge that resembles SimHub RPM Gauge Effect*/
-  struct RPMGauge {
+  /* structure to hold params for updating RPMs effect*/
+  struct s_RPMs {
     CRGB *leds,               //pointer to LED strip
       uint16_t startPos,      //Starting LED
       uint16_t ledCount,      //Number of LEDs to include in effect
@@ -26,64 +25,44 @@ public:
       uint16_t blinkDelay     //blink delay for redline blink animation
   };
 
-/* 
-    CRGB* leds,             //pointer to LED strip
-    uint16_t startPos,      //Starting LED
-    uint16_t ledCount,      //Number of LEDs to include in effect
-    CRGB startColor,        //Starting Color in CRGB format
-    CRGB endColor,          //Ending color in CRGB format
-    uint16_t minRPM,        //minimum RPM value (Default: 0%)
-    uint16_t maxRPM,        //maximum RPM value (Default: 100%)
-    bool useDimming,        //fade last LED
-    bool rightToLeft,       //animation direction
-    bool redlineAnimation,  //blink Color 1 & 2 when RPM = 100%
-    CRGB redlineColor1,     //Color 1 of RPM Redline animation blink
-    CRGB redlineColor2,     //Color 2 of PRM redline animation blink
-    uint16_t blinkDelay     //blink delay for redline blink animation
+  /**
+     * @brief returns an s_RPMs struct for use in drawing the RPMs effect. 
+     * Stores params into struct for easy recall
+     * @param leds pointer to LED strip array CRGB object
+     * @param startPos Starting LED index in the strip
+     * @param ledCount Number of LEDs used for the gauge
+     * @param startColor Color at the lowest RPM
+     * @param endColor Color at the highest RPM
+     * @param minRPM Minimum RPM value (0% level)
+     * @param maxRPM Maximum RPM value (100% level)
+     * @param useDimming Whether to use dimming effect (default: true)
+     * @param rightToLeft Direction of LED fill (default: true)
+     * @param redlineAnimation blink Color 1 & 2 when RPM = 100%     
+     * @param redlineColor1 Color 1 of RPM Redline animation blink
+     * @param redlineColor2 Color 2 of PRM redline animation blink
+     * @param blinkDelay redline animation blink delay time in ms
+     */
+  //store params into struct for RPMs effect handling
+  s_RPMs createRPMsEffect(CRGB* leds, uint16_t startPos, uint16_t ledCount,
+                          CRGB startColor, CRGB endColor, uint16_t minRPM, uint16_t maxRPM,
+                          bool useDimming, bool rightToLeft, bool redlineAnimation, CRGB redlineColor1,
+                          CRGB redlineColor2, uint16_t blinkDelay);
 
-
-
-  RPMGauge createRPMGauge(
-    CRGB* leds,             //pointer to LED strip
-    uint16_t startPos,      //Starting LED
-    uint16_t ledCount,      //Number of LEDs to include in effect
-    CRGB startColor,        //Starting Color in CRGB format
-    CRGB endColor,          //Ending color in CRGB format
-    uint16_t minRPM,        //minimum RPM value (Default: 0%)
-    uint16_t maxRPM,        //maximum RPM value (Default: 100%)
-    bool useDimming,        //fade last LED
-    bool rightToLeft,       //animation direction
-    bool redlineAnimation,  //blink Color 1 & 2 when RPM = 100%
-    CRGB redlineColor1,     //Color 1 of RPM Redline animation blink
-    CRGB redlineColor2,     //Color 2 of PRM redline animation blink
-    uint16_t blinkDelay     //blink delay for redline blink animation
-  );
-}
-
-
-
-
-
-
-
-
-void updateRPMGauge(uint16_t RPMs, RPMGauge rpmGauge);
-
-
-
+  /**
+    * @brief Updates RPMs effect in the LED strip
+    * @param currentRPM RPMs value (0-100%) for the effect
+    * @param s_RPMs structure containing all the parameters for updating the LEDs. See struct "s_RPMs"
+  */
+  void updateRPMs_Effect(uint16_t currentRPM, s_RPMs rpms);
 
 
 private:
-CRGB* _leds;
-uint16_t _numLeds;
-uint8_t _effectIndex;
-}
-;
+  CRGB* _leds;
+  uint16_t _numLeds;
+  uint8_t _effectIndex;
+};
 
-
-
-
-#endif  //END FASTLED_PLUS_H
+#endif  //SH_EFFECTS_H
 
 
 
