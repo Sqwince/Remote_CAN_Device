@@ -2,8 +2,8 @@
 
 //Constructor
 FastLED_Plus::FastLED_Plus() {
-//_leds = leds;
-// _numLeds = numLeds;
+  //_leds = leds;
+  // _numLeds = numLeds;
 }
 
 
@@ -83,7 +83,3 @@ void FastLED_Plus::chase(CRGB* leds, uint16_t numLeds, uint8_t color, uint8_t sp
 
   FastLED.show();
 }
-
-
-
-

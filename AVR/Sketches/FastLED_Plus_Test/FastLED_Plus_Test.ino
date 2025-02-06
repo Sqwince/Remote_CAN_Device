@@ -14,20 +14,30 @@ const long refreshRateDelayInMillis = ((1 / REFRESH_RATE) * 1000);  //HID Pollin
 
 CRGB leds[NUM_LEDS];  //LED strip as array of CRGB colors for FastLED lib
 
-//WS2812B,GRB, LED_PIN, NUM_LEDS
-FastLED_Plus effects();
-
-
-
 /*#############################################################################*/
 void setup() {
-  FastLED.addLeds<WS2812B, LED_PIN, GRB>(leds, NUM_LEDS);
-  FastLED.clear();
-  FastLED.show();
+  FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
+  FastLED.clear();  //all to black
+  FastLED.show();   //refresh strip
+
+  RPMGauge RPMGauge_Left = createRPMGauge(
+    CRGB * leds,            //pointer to LED strip
+    uint16_t 0,             //Starting LED
+    uint16_t NUM_LEDS / 2,  //Number of LEDs to include in effect
+    CRGB::Green,            //Starting Color in CRGB format
+    CRGB::Red,              //Ending color in CRGB format
+    uint16_t 0,             //minimum RPM value (Default: 0%)
+    uint16_t 100,           //maximum RPM value (Default: 100%)
+    bool true,              //fade last LED
+    bool true,              //animation direction
+    bool true,              //blink Color 1 & 2 when RPM = 100%
+    CRGB::Red,              //Color 1 of RPM Redline animation blink
+    CRGB::Blue,             //Color 2 of PRM redline animation blink
+    uint16_t 50             //blink delay for redline blink animation
+  );
 }
 
 /*#############################################################################*/
 void loop() {
-  effects.breathe(leds, NUM_LEDS, 5);
-  delay(30);
+  updateRPMGauge(uint16_t 56, RPMGauge_Left);
 }
