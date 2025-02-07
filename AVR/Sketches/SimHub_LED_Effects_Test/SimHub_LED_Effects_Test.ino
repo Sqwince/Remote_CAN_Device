@@ -22,9 +22,9 @@ s_RPMs RPMs_Right;
 void setup() {
   //Initialize the LED Strip using FastLED library
   FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
-  FastLED.maximizeBrightness(100); //set maximum brightness for the LEDs
-  FastLED.clear();  //all to black
-  FastLED.show();   //refresh strip
+  FastLED.maximizeBrightness(100);  //set maximum brightness for the LEDs
+  FastLED.clear();                  //all to black
+  FastLED.show();                   //refresh strip
 
   //RPMs effect using left half of LED Strip
   s_RPMs RPMs_Left = createRPMsEffect(
@@ -40,7 +40,7 @@ void setup() {
     bool true,              //blink Color 1 & 2 when RPM = 100%
     CRGB::Red,              //Color 1 of RPM Redline animation blink
     CRGB::Blue,             //Color 2 of PRM redline animation blink
-    uint16_t 100             //blink delay for redline blink animation
+    uint16_t 100            //blink delay for redline blink animation
   );
 
   //RPMs effect using left half of LED Strip
@@ -63,9 +63,13 @@ void setup() {
 
 /*#############################################################################*/
 void loop() {
+  if (currentMillis - previousMillis >= RefreshRateDelayInMillis) {
+    previousMillis = currentMillis;  //save last time polled.
+    
+    //Potentiometer to RPM%
+    uint16_t potValue = analogRead(POT_PIN);                  //for testing
+    uint16_t rpmPercentage = map(potValue, 0, 1023, 0, 100);  //to %
 
-  uint16_t potValue = analogRead(POT_PIN); //for testing
-  uint16_t rpmPercentage = map(potValue, 0, 1023, 0, 100); //to %
-
-  updateRPMGauge(rpmPercentage, RPMs_Left);
+    updateRPMGauge(rpmPercentage, RPMs_Left);
+  }
 }

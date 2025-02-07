@@ -25,7 +25,7 @@ s_RPMs SH_Effects::createRPMsEffect(
 
   rpmEffect.leds = _leds;                    //pointer to LED strip
   rpmEffect.startPos = _startPos;            //Starting LED
-  rpmEffect.endPos = _ledCount;              //Number of LEDs to include in effect
+  rpmEffect.ledCount = _ledCount;            //Number of LEDs to include in effect
   rpmEffect.startColor = _startColor;        //Starting Color in CRGB format
   rpmEffect.endColor = _endColor;            //Ending color in CRGB format
   rpmEffect.minRPM = _minRPM;                //minimum RPM value (Default: 0%)
@@ -40,42 +40,36 @@ s_RPMs SH_Effects::createRPMsEffect(
 }
 
 /*draw RPM effect on LED Strip that resembles SimHub RPMs (0% to 100%) Effect*/
-void FastLED_Plus::updateRPMs_Effect(uint16_t currentRPM, s_RPMs rpms){
+void FastLED_Plus::updateRPMs_Effect(uint16_t currentRPM, s_RPMs rpms) {
 
+  //int ledPosition = map(potValue, 0, 1023, 0, half_LED_Num * DIMMING_STEPS);  // 4 steps per LED
 
-  
-};
+  uint16_t ledPosition = map(currentRPM, rpmEffect.minRPM, rpmEffect.maxRPM, rpmEffect.ledCount * _dimmingSteps);
+  int fullyOnIndex = ledPosition / _dimmingSteps;  // Whole LED index
+  int fadeStep = ledPosition % _dimmingSteps;      // 0-3 step for fading
 
-
-
-
-
-
-
-
-//Un-tested
-void FastLED_Plus::breathe(CRGB* leds, uint16_t numLeds, uint8_t speed) {
-  static uint8_t brightness = 0;
-  static int8_t direction = 1;
-
-  brightness += direction * speed;
-  if (brightness == 0 || brightness == 255) {
-    direction = -direction;
+  // Define the color gradient from Blue to Red
+  for (int i = 0; i < half_LED_Num; i++) {
+    leds[i] = blend(CRGB::Green, CRGB::Red, (i * 255) / (half_LED_Num - 1));
   }
 
-  for (uint16_t i = 0; i < numLeds; i++) {
-    leds[i].fadeToBlackBy(255 - brightness);
+  // Adjust brightness
+  for (int i = 0; i < half_LED_Num; i++) {
+    if (i < fullyOnIndex) {
+      leds[i].maximizeBrightness();  // Fully on
+    } else if (i == fullyOnIndex) {
+      uint8_t brightness = map(fadeStep, 0, DIMMING_STEPS - 1, 0, 255);  // Start dim, increase brightness
+      leds[i].nscale8(brightness);
+    } else {
+      leds[i].nscale8(0);  // Off
+    }
+  }
+
+  for (int i = 0; i < half_LED_Num + 1; i++) {
+    leds[(NUM_LEDS - 1) - i] = leds[i];
   }
   FastLED.show();
 }
-
-//Un-tested
-void FastLED_Plus::chase(CRGB* leds, uint16_t numLeds, uint8_t color, uint8_t speed) {
-  static uint16_t index = 0;
-  index = (index + speed) % numLeds;
-
-  fill_solid(leds, numLeds, CRGB::Black);
-  leds[index] = CHSV(color, 255, 255);
-
-  FastLED.show();
 }
+}
+;

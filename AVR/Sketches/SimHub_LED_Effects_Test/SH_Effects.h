@@ -60,6 +60,7 @@ private:
   CRGB* _leds;
   uint16_t _numLeds;
   uint8_t _effectIndex;
+  uint8_t _dimmingSteps = 8; //Number of steps to use for dimming function
 };
 
 #endif  //SH_EFFECTS_H
