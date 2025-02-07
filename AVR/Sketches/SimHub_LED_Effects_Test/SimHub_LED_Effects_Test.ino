@@ -4,7 +4,7 @@
 #define NUM_LEDS 18
 #define DATA_PIN 6
 #define DIMMING_STEPS 8
-#define MAX_BRIGHTNESS 100  //maximum brightness [0-255]
+#define MAX_BRIGHTNESS 10  //maximum brightness [0-255]
 #define DEBUG_ENABLED true  //serial output messages
 #define REFRESH_RATE 10     //RefreshRate [10 FPS]
 #define POT_PIN A1          // Potentiometer input to represent RPMs
@@ -15,13 +15,20 @@ const long refreshRateDelayInMillis = ((1 / REFRESH_RATE) * 1000);  //HID Pollin
 //LED strip as array of CRGB colors for FastLED lib
 CRGB leds[NUM_LEDS];
 //RPMs effect using left half of LED Strip
-RPMsEffect RPMs_Left(leds, false, 0, NUM_LEDS, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Yellow, CRGB::Blue);
-
+RPMsEffect RPMs_Left(leds, true, 0, NUM_LEDS/2, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Yellow, CRGB::Blue);
+RPMsEffect RPMs_Right(leds, true, NUM_LEDS/2+1, NUM_LEDS, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Blue, CRGB::Yellow);
 /*#############################################################################*/
 void setup() {
+
+  //debugger
+  if (DEBUG_ENABLED) {
+    Serial.begin(115200);
+    Serial.println(">>Serial Initialized..");
+  }
+
   //Initialize the LED Strip using FastLED library
   FastLED.addLeds<WS2812B, DATA_PIN, GRB>(leds, NUM_LEDS);
-  FastLED.setBrightness(100);  //set maximum brightness for the LEDs
+  FastLED.setBrightness(MAX_BRIGHTNESS);  //set maximum brightness for the LEDs
   FastLED.clear();             //all to black
   FastLED.show();              //refresh strip
 
@@ -50,7 +57,13 @@ void loop() {
 
     //Potentiometer to RPM%
     uint16_t potValue = analogRead(POT_PIN);                  //for testing
-    uint16_t rpmPercentage = map(potValue, 0, 1023, 0, 100);  //to %
+
+    //lowered pot rangebecause of battery power testing (brownout reduction)
+    uint16_t rpmPercentage = map(potValue, 0, 1000, 0, 100);  //to %    
+    //uint16_t rpmPercentage = map(potValue, 0, 1023, 0, 100);  //to %
+
+    //serial print pot value for debugging
+    if (DEBUG_ENABLED) { Serial.println(rpmPercentage); }
 
     RPMs_Left.update(rpmPercentage);
     //RPMs_Right.update(rpmPercentage);

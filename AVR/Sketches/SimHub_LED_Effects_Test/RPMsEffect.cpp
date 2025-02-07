@@ -26,34 +26,84 @@ RPMsEffect::~RPMsEffect() {}
 /*draw RPM effect on LED Strip that resembles SimHub RPMs (0% to 100%) Effect*/
 void RPMsEffect::update(uint16_t currentRPM) {
 
-  int half_LED_Num = _ledCount / 2;
-
   //currentRPM input value to LED indexes
-  uint16_t ledPosition = map(currentRPM, _minRPM, _maxRPM, 0, _ledCount * _dimmingSteps);
+  uint16_t ledPosition = map(currentRPM, _minRPM, _maxRPM, _startPos, _ledCount * _dimmingSteps);
   int fullyOnIndex = ledPosition / _dimmingSteps;  // Whole LED index
   int fadeStep = ledPosition % _dimmingSteps;      // 0-3 step for fading
 
-  // Define the color gradient from StartColor to EndColor
-  for (int i = 0; i < half_LED_Num; i++) {
-    _leds[i] = blend(_startColor, _endColor, (i * 255) / (half_LED_Num - 1));
-  }
+  bool isAtRedline = (currentRPM >= _maxRPM) ? true : false;
 
-  // Adjust brightness
-  for (int i = 0; i < half_LED_Num; i++) {
-    if (i < fullyOnIndex) {
-      _leds[i].maximizeBrightness();  // Fully on
-    } else if (i == fullyOnIndex) {
-      uint8_t brightness = map(fadeStep, 0, _dimmingSteps - 1, 0, 255);  // Start dim, increase to full brightness
-      _leds[i].nscale8(brightness);
-    } else {
-      _leds[i].nscale8(0);  // Off
+
+
+  // int drawStart = _startPos;
+  // int drawEnd = _startPos + _ledCount;
+  // int drawInc = +1;
+  // //invert start/end for right to left drawing
+  // if (_rightToLeft) {
+  //   drawStart = +_ledCount;
+  //   drawEnd = _startPos;
+  //   drawInc = -1;
+  // }
+  // //split mirror hack
+  // for (int i = 0; i < half_LED_Num + 1; i++) {
+  //   _leds[(_ledCount - 1) - i] = _leds[i];
+  // }
+
+  if (!isAtRedline) {
+
+    // Define the color gradiant from StartColor to EndColor for the full LED strip
+    for (int i = _startPos; i < _ledCount; i++) {
+
+      // int index = i;                                         //Draw left to right (Default)
+      // if (!_rightToLeft) { index = ((_ledCount - 1) - i); }  //Draw Right to left
+
+      //Fill entire array with calculated colors
+      _leds[getRTLIndex(i)] = blend(_startColor, _endColor, (i * 255) / (_ledCount - 1));
+    }
+
+
+    // Adjust brightness
+    for (int i = _startPos; i < _ledCount; i++) {
+      if (i < fullyOnIndex) {
+        _leds[getRTLIndex(i)].maximizeBrightness();  // Fully on
+      } else if (i == fullyOnIndex) {
+        uint8_t brightness = map(fadeStep, 0, _dimmingSteps - 1, 0, 255);  // Start dim, increase to full brightness
+        _leds[getRTLIndex(i)].nscale8(brightness);
+      } else {
+        _leds[getRTLIndex(i)].nscale8(0);  // Off
+      }
+    }
+  } else {
+    //Draw Redline Blink Animation
+    //if (rpmPercentage >= maxRPM && millis() - lastBlinkTime >= redlineBlinkMs) {
+    unsigned long currentBlinkMillis = millis();
+
+    if (currentBlinkMillis - _lastBlinkTime >= _blinkDelay) {
+      _blinkState = !_blinkState;
+      _lastBlinkTime = currentBlinkMillis;
+
+      for (int i = _startPos; i < _ledCount; i++) {
+        _leds[getRTLIndex(i)] = _blinkState ? _redlineColor1 : _redlineColor2;  //alternate between RLcolor 1 & 2
+      }
+
+
+      // //split mirror hack
+      // for (int i = 0; i < half_LED_Num + 1; i++) {
+      //   _leds[(_ledCount - 1) - i] = _leds[i];
+      // }
+
+      FastLED.show();
     }
   }
-
-  //split mirror hack
-  for (int i = 0; i < half_LED_Num + 1; i++) {
-    _leds[(_ledCount - 1) - i] = _leds[i];
-  }
-
-  FastLED.show();
 }
+
+
+  /**
+    * @brief returns the LED array index based on draw direction
+    * @param index of element in LED array
+  */
+  int RPMsEffect::getRTLIndex(int i) {
+      int index = i; //Draw left to right (Default)                             
+      if (!_rightToLeft) { index = ((_ledCount - 1) - i); }  //Draw Right to left
+     return index;
+  }

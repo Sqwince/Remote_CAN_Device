@@ -1,6 +1,9 @@
 #ifndef RPMSEFFECT_H
 #define RPMSEFFECT_H
 
+/// @file RPMsEffect.h
+/// Utility functions for color fill, palettes, blending, and more
+
 #include <FastLED.h>
 
 class RPMsEffect {
@@ -18,29 +21,17 @@ private:
   CRGB _redlineColor2;  //Color 2 of PRM redline animation blink
 
   //default effect (can be updated with functions later)
-  uint16_t _blinkDelay = 250;  //blink delay for redline blink animation
+  uint16_t _blinkDelay = 100;  //blink delay for redline blink animation
   bool _useDimming = true;     //fade last LED
   uint8_t _dimmingSteps = 8;   //Number of steps to use for dimming function
 
-
+  //Redline Blink State Variables
+  unsigned long _lastBlinkTime = 0;  // Last recorded blink time
+  bool _blinkState = false;          // State of blinking for redline alert
 
 public:
 
-  /**  //Constructor
-     * @brief Create an RPMs effect object 
-     * Stores params into struct for easy recall
-     * @param leds pointer to LED strip array CRGB object
-     * @param rightToLeft Direction of LED fill (default: true)
-     * @param startPos Starting LED index in the strip
-     * @param ledCount Number of LEDs used for the gauge
-     * @param startColor Color at the lowest RPM
-     * @param endColor Color at the highest RPM
-     * @param minRPM Minimum RPM value (0% level)
-     * @param maxRPM Maximum RPM value (100% level)
-     * @param redlineBlink blink Color 1 & 2 when RPM = 100%     
-     * @param redlineColor1 Color 1 of RPM Redline animation blink
-     * @param redlineColor2 Color 2 of PRM redline animation blink
-     */
+  /* CONSTRUCTOR */
   RPMsEffect(CRGB* leds,           //pointer to LED strip
              bool rightToLeft,     //animation direction
              uint16_t startPos,    //Starting LED
@@ -65,6 +56,15 @@ public:
     * @param currentRPM RPMs value (0-100%) for the effect
   */
   void update(uint16_t currentRPM);
+
+
+
+  /**
+    * @brief returns the LED array index based on draw direction
+    * @param index of element in LED array
+  */
+  int getRTLIndex(int index);
+
 };
 
 
