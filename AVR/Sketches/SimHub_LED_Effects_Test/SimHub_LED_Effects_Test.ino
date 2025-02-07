@@ -15,7 +15,7 @@ const long refreshRateDelayInMillis = ((1 / REFRESH_RATE) * 1000);  //HID Pollin
 //LED strip as array of CRGB colors for FastLED lib
 CRGB leds[NUM_LEDS];
 //RPMs effect using left half of LED Strip
-RPMsEffect RPMs_Left(leds, false, 0, NUM_LEDS / 2, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Yellow, CRGB::Blue);
+RPMsEffect RPMs_Left(leds, false, 0, NUM_LEDS, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Yellow, CRGB::Blue);
 
 /*#############################################################################*/
 void setup() {

@@ -26,18 +26,20 @@ RPMsEffect::~RPMsEffect() {}
 /*draw RPM effect on LED Strip that resembles SimHub RPMs (0% to 100%) Effect*/
 void RPMsEffect::update(uint16_t currentRPM) {
 
+  int half_LED_Num = _ledCount / 2;
+
   //currentRPM input value to LED indexes
   uint16_t ledPosition = map(currentRPM, _minRPM, _maxRPM, 0, _ledCount * _dimmingSteps);
   int fullyOnIndex = ledPosition / _dimmingSteps;  // Whole LED index
   int fadeStep = ledPosition % _dimmingSteps;      // 0-3 step for fading
 
   // Define the color gradient from StartColor to EndColor
-  for (int i = 0; i < _ledCount; i++) {
-    _leds[i] = blend(_startColor, _endColor, (i * 255) / (_ledCount - 1));
+  for (int i = 0; i < half_LED_Num; i++) {
+    _leds[i] = blend(_startColor, _endColor, (i * 255) / (half_LED_Num - 1));
   }
 
   // Adjust brightness
-  for (int i = 0; i < _ledCount; i++) {
+  for (int i = 0; i < half_LED_Num; i++) {
     if (i < fullyOnIndex) {
       _leds[i].maximizeBrightness();  // Fully on
     } else if (i == fullyOnIndex) {
@@ -48,8 +50,10 @@ void RPMsEffect::update(uint16_t currentRPM) {
     }
   }
 
-  for (int i = 0; i < _ledCount + 1; i++) {
+  //split mirror hack
+  for (int i = 0; i < half_LED_Num + 1; i++) {
     _leds[(_ledCount - 1) - i] = _leds[i];
   }
+
   FastLED.show();
 }
