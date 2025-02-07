@@ -1,67 +1,86 @@
-#ifndef SH_EFFECTS_H
-#define SH_EFFECTS_H
+#ifndef RPMSEFFECT_H
+#define RPMSEFFECT_H
 
 #include <FastLED.h>
 
-class SH_Effects {
+class RPMsEffect {
+private:
+  CRGB* _leds;          //pointer to LED strip
+  bool _rightToLeft;    //animation direction
+  uint16_t _startPos;   //Starting LED
+  uint16_t _ledCount;   //Number of LEDs to include in effect
+  CRGB _startColor;     //Starting Color in CRGB format
+  CRGB _endColor;       //Ending color in CRGB format
+  uint16_t _minRPM;     //minimum RPM value (Default: 0%)
+  uint16_t _maxRPM;     //maximum RPM value (Default: 100%)
+  bool _redlineBlink;   //blink Color 1 & 2 when RPM = 100%
+  CRGB _redlineColor1;  //Color 1 of RPM Redline animation blink
+  CRGB _redlineColor2;  //Color 2 of PRM redline animation blink
+
+  //default effect (can be updated with functions later)
+  uint16_t _blinkDelay = 250;  //blink delay for redline blink animation
+  bool _useDimming = true;     //fade last LED
+  uint8_t _dimmingSteps = 8;   //Number of steps to use for dimming function
+
+
+
 public:
-  // SH_Effects();   //Constructor
-  // ~SH_Effects();  //Destructor
 
-  /* structure to hold params for updating RPMs effect*/
-  struct s_RPMs {
-    CRGB *leds,               //pointer to LED strip
-      uint16_t startPos,      //Starting LED
-      uint16_t ledCount,      //Number of LEDs to include in effect
-      CRGB startColor,        //Starting Color in CRGB format
-      CRGB endColor,          //Ending color in CRGB format
-      uint16_t minRPM,        //minimum RPM value (Default: 0%)
-      uint16_t maxRPM,        //maximum RPM value (Default: 100%)
-      bool useDimming,        //fade last LED
-      bool rightToLeft,       //animation direction
-      bool redlineAnimation,  //blink Color 1 & 2 when RPM = 100%
-      CRGB redlineColor1,     //Color 1 of RPM Redline animation blink
-      CRGB redlineColor2,     //Color 2 of PRM redline animation blink
-      uint16_t blinkDelay     //blink delay for redline blink animation
-  };
-
-  /**
-     * @brief returns an s_RPMs struct for use in drawing the RPMs effect. 
+  /**  //Constructor
+     * @brief Create an RPMs effect object 
      * Stores params into struct for easy recall
      * @param leds pointer to LED strip array CRGB object
+     * @param rightToLeft Direction of LED fill (default: true)
      * @param startPos Starting LED index in the strip
      * @param ledCount Number of LEDs used for the gauge
      * @param startColor Color at the lowest RPM
      * @param endColor Color at the highest RPM
      * @param minRPM Minimum RPM value (0% level)
      * @param maxRPM Maximum RPM value (100% level)
-     * @param useDimming Whether to use dimming effect (default: true)
-     * @param rightToLeft Direction of LED fill (default: true)
-     * @param redlineAnimation blink Color 1 & 2 when RPM = 100%     
+     * @param redlineBlink blink Color 1 & 2 when RPM = 100%     
      * @param redlineColor1 Color 1 of RPM Redline animation blink
      * @param redlineColor2 Color 2 of PRM redline animation blink
-     * @param blinkDelay redline animation blink delay time in ms
      */
-  //store params into struct for RPMs effect handling
-  s_RPMs createRPMsEffect(CRGB* leds, uint16_t startPos, uint16_t ledCount,
-                          CRGB startColor, CRGB endColor, uint16_t minRPM, uint16_t maxRPM,
-                          bool useDimming, bool rightToLeft, bool redlineAnimation, CRGB redlineColor1,
-                          CRGB redlineColor2, uint16_t blinkDelay);
+  RPMsEffect(CRGB* leds,           //pointer to LED strip
+             bool rightToLeft,     //animation direction
+             uint16_t startPos,    //Starting LED
+             uint16_t ledCount,    //Number of LEDs to include in effect
+             CRGB startColor,      //Starting Color in CRGB format
+             CRGB endColor,        //Ending color in CRGB format
+             uint16_t minRPM,      //minimum RPM value (Default: 0%)
+             uint16_t maxRPM,      //maximum RPM value (Default: 100%)
+             bool redlineBlink,    //blink Color 1 & 2 when RPM = 100%
+             CRGB redlineColor1,   //Color 1 of RPM Redline animation blink
+             CRGB redlineColor2);  //Color 2 of PRM redline animation blink
+
+
+  /** Destructor
+    * @brief Destroys an RPMs effect object and frees up memory
+    */
+  ~RPMsEffect();  //Destructor
+
 
   /**
-    * @brief Updates RPMs effect in the LED strip
+    * @brief Calculates the LED colors based on currentRPMs value
     * @param currentRPM RPMs value (0-100%) for the effect
-    * @param s_RPMs structure containing all the parameters for updating the LEDs. See struct "s_RPMs"
   */
-  void updateRPMs_Effect(uint16_t currentRPM, s_RPMs rpms);
-
-
-private:
-  CRGB* _leds;
-  uint16_t _numLeds;
-  uint8_t _effectIndex;
-  uint8_t _dimmingSteps = 8; //Number of steps to use for dimming function
+  void update(uint16_t currentRPM);
 };
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 #endif  //SH_EFFECTS_H
 
