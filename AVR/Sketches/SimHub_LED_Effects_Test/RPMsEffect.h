@@ -5,20 +5,22 @@
 /// Utility functions for color fill, palettes, blending, and more
 
 #include <FastLED.h>
+#include "BlinkEffect.h"
 
 class RPMsEffect {
 private:
-  CRGB* _leds;          //pointer to LED strip
-  bool _rightToLeft;    //animation direction
-  uint16_t _startPos;   //Starting LED
-  uint16_t _ledCount;   //Number of LEDs to include in effect
-  CRGB _startColor;     //Starting Color in CRGB format
-  CRGB _endColor;       //Ending color in CRGB format
-  uint16_t _minRPM;     //minimum RPM value (Default: 0%)
-  uint16_t _maxRPM;     //maximum RPM value (Default: 100%)
-  bool _redlineBlink;   //blink Color 1 & 2 when RPM = 100%
-  CRGB _redlineColor1;  //Color 1 of RPM Redline animation blink
-  CRGB _redlineColor2;  //Color 2 of PRM redline animation blink
+  CRGB* _leds;               //pointer to LED strip
+  bool _rightToLeft;         //animation direction
+  uint16_t _startPos;        //Starting LED
+  uint16_t _ledCount;        //Number of LEDs to include in effect
+  CRGB _startColor;          //Starting Color in CRGB format
+  CRGB _endColor;            //Ending color in CRGB format
+  uint16_t _minRPM;          //minimum RPM value (Default: 0%)
+  uint16_t _maxRPM;          //maximum RPM value (Default: 100%)
+  bool _redlineBlink;        //blink Color 1 & 2 when RPM = 100%
+  CRGB _redlineColor1;       //Color 1 of RPM Redline animation blink
+  CRGB _redlineColor2;       //Color 2 of PRM redline animation blink
+  BlinkEffect redlineBlink;  //blinkeffect object
 
   //default effect (can be updated with functions later)
   uint16_t _blinkDelay = 100;  //blink delay for redline blink animation
@@ -51,11 +53,6 @@ public:
   ~RPMsEffect();  //Destructor
 
 
-  void setBlinkDelay(uint16_t delay); 
-
-  uint16_t getBlinkDelay();
-
-
   /**
     * @brief Calculates the LED colors based on currentRPMs value
     * @param currentRPM RPMs value (0-100%) for the effect
@@ -66,6 +63,20 @@ public:
   /*#####################################################*/
   /*####              HELPER FUNCTIONS               ####*/
   /*#####################################################*/
+
+  /**
+    * @brief Sets the LED blink rate
+    * @param delay delay in ms
+  */
+  void setBlinkDelay(uint16_t delay);
+
+
+  /**
+    * @brief returns uint16_t of current blink delay in ms
+  */
+  uint16_t getBlinkDelay();
+
+
   /**
     * @brief returns the LED array index based on draw direction
     * @param index of element in LED array
@@ -73,145 +84,10 @@ public:
   int getRTLIndex(int index);
 };
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 #endif  //SH_EFFECTS_H
 
 
 
-// #include <FastLED.h>
-
-// template<const int dataPin>  //LED Strip DataIN connected to this MCU pin
-// class RPMGauge {
-// public:
-//   /**
-//      * @brief Constructor for RPMGauge
-//      * @param dataPin LED Strip Data connected to this MCU data pin
-//      * @param startPos Starting LED index in the strip
-//      * @param ledCount Number of LEDs used for the gauge
-//      * @param startColor Color at the lowest RPM
-//      * @param endColor Color at the highest RPM
-//      * @param bgColor Default color of the background LEDs
-//      * @param minRPM Minimum RPM value (0% level)
-//      * @param maxRPM Maximum RPM value (100% level)
-//      * @param redlineBlinkMs Blinking interval for redline alert
-//      * @param useDimming Whether to use dimming effect (default: true)
-//      * @param rightToLeft Direction of LED fill (default: true)
-//      */
-//   RPMGauge(
-//     const int startPos,             //  Arg1: Starting LED index in the strip
-//     const int ledCount,             //  Arg2: Number of LEDs used for the gauge
-//     CRGB startColor,                //  Arg4: Color at the lowest RPM
-//     CRGB endColor,                  //  Arg5: Color at the highest RPM
-//     CRGB bgColor,                   //  Arg3: Default color of the background LEDs
-//     const int minRPM,               //  Arg6: Minimum RPM value (0% level)
-//     const int maxRPM,               //  Arg7: Maximum RPM value (100% level)
-//     const int redlineBlinkMs,       //  Arg8: Blinking interval for redline alert
-//     const bool useDimming = true,   //  Arg9: Whether to use dimming effect
-//     const bool rightToLeft = true)  // Arg10: Direction of LED fill (true = right to left)
-//     : startPos(startPos), ledCount(ledCount), startColor(startColor), endColor(endColor), bgColor(bgColor),
-//       minRPM(minRPM), maxRPM(maxRPM), redlineBlinkMs(redlineBlinkMs), useDimming(useDimming),
-//       rightToLeft(rightToLeft), lastBlinkTime(0), blinkState(false) {
-
-//     // Allocate memory for the LED array
-//     leds = new CRGB[ledCount];
-
-//     // Initialize the LED strip (Assuming data pin 6)
-//     FastLED.addLeds<WS2812B, dataPin, GRB>(leds, ledCount);
-//   }
-//   //Destructor
-//   ~RPMGauge() {
-//     delete[] leds;  // Free allocated memory
-//   }
-
-//   //Upate LED colors in array based on RPM% value
-//   void update(int rpmPercentage) {
-//     int ledPosition = map(rpmPercentage, minRPM, maxRPM, 0, ledCount * dimmingSteps);
-//     int fullyOnIndex = ledPosition / dimmingSteps;  // Whole LED index
-//     int fadeStep = ledPosition % dimmingSteps;      // Steps for fading each LED
-
-
-
-//     bool RPM_redlined;
-
-
-//     RPM_redlined = (rpmPercentage >= maxRPM) ? true : false;
-
-
-//     //Fill gradiant based on RPMs
-//     if (!RPM_redlined) {
-//       // Define the color gradient from Blue to Red
-//       for (int i = 0; i < ledCount; i++) {
-//         leds[i] = blend(startColor, endColor, (i * 255) / (ledCount - 1));
-//       }
-
-//       // Adjust brightness
-//       for (int i = 0; i < ledCount; i++) {
-//         if (i < fullyOnIndex) {
-//           leds[i].maximizeBrightness();  // Fully on
-//         } else if (i == fullyOnIndex) {
-//           uint8_t brightness = map(fadeStep, 0, dimmingSteps - 1, 0, 255);
-//           leds[i].nscale8(brightness);
-//         } else {
-//           leds[i] = bgColor;
-//         }
-//       }
-//     } else {
-
-//       //Redline Blink Animation
-//       //if (rpmPercentage >= maxRPM && millis() - lastBlinkTime >= redlineBlinkMs) {
-//       if (millis() - lastBlinkTime >= redlineBlinkMs) {
-//         blinkState = !blinkState;
-//         lastBlinkTime = millis();
-
-//         // Debugging
-//         // Serial.print("Blink State: ");
-//         // Serial.println(blinkState ? "RED" : "BLACK");
-
-//         for (int i = 0; i < ledCount; i++) {
-//           leds[i] = blinkState ? CRGB::Red : CRGB::Black;
-//         }
-//         FastLED.show();
-//       }
-//     }
-//   }
-
-//   //Update all our controllers with the current led colors
-//   void show() {
-//     FastLED.show();
-//   }
-
-// private:
-//   const int startPos;           // Starting LED index
-//   const int ledCount;           // Total number of LEDs used in gauge
-//   CRGB startColor;              // Color at the lowest RPM
-//   CRGB endColor;                // Color at the highest RPM
-//   CRGB bgColor;                 // Default color of the background LEDs
-//   const int minRPM;             // Minimum RPM value
-//   const int maxRPM;             // Maximum RPM value
-//   const int redlineBlinkMs;     // Blink interval for redline warning
-//   const bool useDimming;        // Enable/disable dimming effect
-//   const bool rightToLeft;       // Direction of LED fill
-//   const int dimmingSteps = 8;   // Dimming steps for LED before next starts to dim
-//   unsigned long lastBlinkTime;  // Last recorded blink time
-//   bool blinkState;              // State of blinking for redline alert
-//   CRGB* leds;                   // Pointer to the LED array
-// };
-
-// #endif
 
 
 

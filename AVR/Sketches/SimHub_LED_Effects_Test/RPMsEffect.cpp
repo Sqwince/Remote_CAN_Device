@@ -1,6 +1,5 @@
 #include "RPMsEffect.h"
 
-
 //Constructor
 RPMsEffect::RPMsEffect(
   CRGB* leds,          //pointer to LED strip
@@ -16,7 +15,8 @@ RPMsEffect::RPMsEffect(
   CRGB redlineColor2)  //Color 2 of PRM redline animation blink
   : _leds(leds), _rightToLeft(rightToLeft), _startPos(startPos), _ledCount(ledCount),
     _startColor(startColor), _endColor(endColor), _minRPM(minRPM), _maxRPM(maxRPM),
-    _redlineBlink(redlineBlink), _redlineColor1(redlineColor1), _redlineColor2(redlineColor2) {}
+    _redlineBlink(redlineBlink), _redlineColor1(redlineColor1), _redlineColor2(redlineColor2),
+    redlineBlink(leds, BlinkEffect::flashing, startPos, ledCount, redlineColor1, redlineColor2) {}
 
 
 //Destructor
@@ -29,7 +29,7 @@ void RPMsEffect::update(uint16_t currentRPM) {
   //currentRPM input value to LED indexes
   uint16_t ledPosition = map(currentRPM, _minRPM, _maxRPM, 0, _ledCount * _dimmingSteps);
   int fullyOnIndex = _startPos + (ledPosition / _dimmingSteps);  // Whole LED index
-  int fadeStep = ledPosition % _dimmingSteps;      // 0-3 step for fading
+  int fadeStep = ledPosition % _dimmingSteps;                    // 0-3 step for fading
 
   bool isAtRedline = (currentRPM >= _maxRPM) ? true : false;
 
@@ -64,27 +64,30 @@ void RPMsEffect::update(uint16_t currentRPM) {
       }
     }
   } else {
+
     //Draw Redline Blink Animation
+    redlineBlink.update(isAtRedline);
+
+
     //if (rpmPercentage >= maxRPM && millis() - lastBlinkTime >= redlineBlinkMs) {
-    unsigned long currentBlinkMillis = millis();
+    // unsigned long currentBlinkMillis = millis();
 
-    if (currentBlinkMillis - _lastBlinkTime >= _blinkDelay) {
-      _blinkState = !_blinkState;
-      _lastBlinkTime = currentBlinkMillis;
+    // if (currentBlinkMillis - _lastBlinkTime >= _blinkDelay) {
+    //   _blinkState = !_blinkState;
+    //   _lastBlinkTime = currentBlinkMillis;
 
-      for (int i = _startPos; i < (_startPos + _ledCount); i++) {
-        _leds[i] = _blinkState ? _redlineColor1 : _redlineColor2;  //alternate between RLcolor 1 & 2
-      }
+    //   for (int i = _startPos; i < (_startPos + _ledCount); i++) {
+    //     _leds[i] = _blinkState ? _redlineColor1 : _redlineColor2;  //alternate between RLcolor 1 & 2
+    //   }
 
 
-      // //split mirror hack
-      // for (int i = 0; i < half_LED_Num + 1; i++) {
-      //   _leds[(_ledCount - 1) - i] = _leds[i];
-      // }
-
-    }
+    // //split mirror hack
+    // for (int i = 0; i < half_LED_Num + 1; i++) {
+    //   _leds[(_ledCount - 1) - i] = _leds[i];
+    // }
   }
 }
+
 
 
 
@@ -101,10 +104,10 @@ int RPMsEffect::getRTLIndex(int i) {
   return index;
 }
 
-  void RPMsEffect::setBlinkDelay(uint16_t delay) {
-    _blinkDelay = delay;
-  }
+void RPMsEffect::setBlinkDelay(uint16_t delay) {
+  redlineBlink.setBlinkDelay(delay);
+}
 
-  uint16_t RPMsEffect::getBlinkDelay() {
-    return _blinkDelay;
-  }
+uint16_t RPMsEffect::getBlinkDelay() {
+  return _blinkDelay;
+}

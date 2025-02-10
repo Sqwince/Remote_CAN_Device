@@ -33,8 +33,8 @@ CRGB leds[NUM_LEDS];
 RPMsEffect RPMs_Left(leds, false, 3, 6, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Red, CRGB::Blue);
 RPMsEffect RPMs_Right(leds, true, 9, 6, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Blue, CRGB::Red);
 
-BlinkEffect yellowFlag1(leds, 1, 0, 3, CRGB::Yellow, CRGB::Black);
-BlinkEffect yellowFlag2(leds, 1, 15, 3, CRGB::Yellow, CRGB::Black);
+BlinkEffect yellowFlag1(leds, BlinkEffect::flashing, 0, 3, CRGB::Yellow, CRGB::Black);
+BlinkEffect yellowFlag2(leds, BlinkEffect::flashing, 15, 3, CRGB::Yellow, CRGB::Black);
 
 /*#############################################################################*/
 void setup() {
@@ -69,25 +69,23 @@ void loop() {
   if (currentMillis - previousMillis >= refreshRateDelayInMillis) {
     previousMillis = currentMillis;  //save last time polled.
 
-    //FastLED.clear();
-
+    //READ INPUTS
+    // ***** FUTURE: Replace with SIMHUB MSG Handler *****
+    
     //Potentiometer to RPM%
-    uint16_t potValue = analogRead(POT_PIN);  //for testing
+    uint16_t potValue = analogRead(POT_PIN);  //for testing 
+    uint16_t rpmPercentage = map(potValue, 0, 1000, 0, 100);  //Analog to % //lowered to 1000 for brownout reduction (s/b 1023)
+   
+    //get Flag states
+    bool state = digitalRead(BUTTON_PIN);
 
-    //lowered pot rangebecause of battery power testing (brownout reduction)
-    uint16_t rpmPercentage = map(potValue, 0, 1000, 0, 100);  //to %
-    //uint16_t rpmPercentage = map(potValue, 0, 1023, 0, 100);  //to %
-
-    //serial print pot value for debugging
-    if (DEBUG_ENABLED) { Serial.println(rpmPercentage); }
-
+    //Update Effect(s)
     RPMs_Left.update(rpmPercentage);
     RPMs_Right.update(rpmPercentage);
-
-    bool state = digitalRead(BUTTON_PIN);
     yellowFlag1.update(state);
     yellowFlag2.update(state);
 
+    //DRAW LEDs
     FastLED.show();
   }
 }
