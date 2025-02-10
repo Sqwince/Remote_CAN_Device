@@ -64,31 +64,10 @@ void RPMsEffect::update(uint16_t currentRPM) {
       }
     }
   } else {
-
     //Draw Redline Blink Animation
     redlineBlink.update(isAtRedline);
-
-
-    //if (rpmPercentage >= maxRPM && millis() - lastBlinkTime >= redlineBlinkMs) {
-    // unsigned long currentBlinkMillis = millis();
-
-    // if (currentBlinkMillis - _lastBlinkTime >= _blinkDelay) {
-    //   _blinkState = !_blinkState;
-    //   _lastBlinkTime = currentBlinkMillis;
-
-    //   for (int i = _startPos; i < (_startPos + _ledCount); i++) {
-    //     _leds[i] = _blinkState ? _redlineColor1 : _redlineColor2;  //alternate between RLcolor 1 & 2
-    //   }
-
-
-    // //split mirror hack
-    // for (int i = 0; i < half_LED_Num + 1; i++) {
-    //   _leds[(_ledCount - 1) - i] = _leds[i];
-    // }
   }
 }
-
-
 
 
 /*#####################################################*/

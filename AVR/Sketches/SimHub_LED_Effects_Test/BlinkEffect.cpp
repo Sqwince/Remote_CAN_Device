@@ -24,22 +24,74 @@ void BlinkEffect::update(bool enabled) {
     _blinkState = !_blinkState;
     _lastBlinkTime = currentBlinkMillis;
 
-    /* PATTERN = flashing,        //Alternating flashing all LEDs between color1 & color2 -> 1|1|1, 2|2|2, 1|1|1 */
-    /* PATTERN = alternateTwo,    //Even/Odd flip flop animation between color1 & color2  -> 1|2|1, 2|1|2, 1|2|1 */
-    /* PATTERN = alternateThree,  //Even/Odd flip-flop animation between 3 colors         -> 1|3|1, 3|2|3, 1|3|1 */
 
-    //TODO: change to switch/case
-    if (enabled && _pattern == BlinkEffect::flashing) {
-      for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
-        _leds[i] = _blinkState ? _color1 : _color2;  //alternate between color 1 & 2
-      }
-    } else {
-      for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
-        _leds[i] = _color2;  //restore to default
-      }
+    /*##############################################*/
+    /*####              ANIMATIONS              ####*/
+    /*##############################################*/
+    switch (_pattern) {
+
+
+      /*###############################################################################*/
+      //Alternating flashing all LEDs between color1 & color2 -> 1|1|1, 2|2|2, 1|1|1 */
+      /*###############################################################################*/
+      case flashing:
+        if (enabled) {
+          //Calculate LED colors for effect
+          for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
+            _leds[i] = _blinkState ? _color1 : _color2;  //alternate between color 1 & 2
+          }
+          break;
+        }  //break included in enabled loop to fall to default when !enabled
+
+
+      /*###############################################################################*/
+      //Even/Odd flip flop animation between color1 & color2  -> 1|2|1, 2|1|2, 1|2|1 */
+      /*###############################################################################*/
+      case alternateTwo:
+        if (enabled) {
+          //Calculate LED colors for effect
+          for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
+            if (_blinkState) {
+              _leds[i] = (i % 2 == 0) ? _color1 : _color2;  // Even index → color1, Odd index → color2
+            } else {
+              _leds[i] = (i % 2 == 0) ? _color2 : _color1;  // Even index → color1, Odd index → color2
+            }
+          }
+          break;
+        }  //break included in enabled loop to fall to default when !enabled
+
+
+        /*###############################################################################*/
+        //Even/Odd flip-flop animation between 3 colors         -> 1|3|1, 3|2|3, 1|3|1 */
+        /*###############################################################################*/
+      case alternateThree:
+        if (enabled) {
+
+          //Calculate LED colors for effect
+          for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
+            if (_blinkState) {
+              _leds[i] = (i % 2 == 0) ? _color3 : _color1;        // BlinkState1: Even index → color3, Odd index → color1
+            } else {
+              _leds[i] = (i % 2 == 0) ? _color2 : _color3;        // BlinkState2: Even index → color2, Odd index → color3
+            }
+          }
+
+          break;
+        }  //break included in enabled loop to fall to default when !enabled
+
+        /*###############################################################################*/
+        /*          DEFAULT STATE - ALL SET TO COLOR3                                    */
+        /*###############################################################################*/
+      default:
+        //Restore LEDs to default state
+        for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
+          _leds[i] = _color3;  //restore to default
+        }
+        break;
     }
   }
 }
+
 
 /*#####################################################*/
 /*####              HELPER FUNCTIONS               ####*/

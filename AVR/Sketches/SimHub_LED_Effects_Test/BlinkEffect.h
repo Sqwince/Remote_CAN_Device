@@ -45,7 +45,7 @@ private:
   uint16_t _ledCount;    //Number of LEDs to include in effect
   CRGB _color1;          //Color in CRGB format
   CRGB _color2;          //Color in CRGB format
-  CRGB _color3;          //Color in CRGB format
+  CRGB _color3 = CRGB::Black;          //Color in CRGB format
   uint16_t _blinkDelay;  //blink delay for redline blink animation
 
   //State Variables
