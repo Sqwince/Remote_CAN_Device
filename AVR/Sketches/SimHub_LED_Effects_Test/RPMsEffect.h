@@ -51,13 +51,10 @@ public:
   ~RPMsEffect();  //Destructor
 
 
-  void setBlinkDelay(uint16_t delay) {
-    _blinkDelay = delay;
-  }
+  void setBlinkDelay(uint16_t delay); 
 
-  uint16_t getBlinkDelay() {
-    return _blinkDelay;
-  }
+  uint16_t getBlinkDelay();
+
 
   /**
     * @brief Calculates the LED colors based on currentRPMs value

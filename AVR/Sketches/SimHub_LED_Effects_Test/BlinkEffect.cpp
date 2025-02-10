@@ -26,19 +26,29 @@ void BlinkEffect::update(bool enabled) {
     _blinkState = !_blinkState;
     _lastBlinkTime = currentBlinkMillis;
 
-    FastLED.clear();
+    //FastLED.clear();
 
     if (enabled) {
-      // Define the color gradiant from StartColor to EndColor for the full LED strip
       for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
-
-
-
-
-        for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
-          _leds[i] = _blinkState ? _color1 : _color2;  //alternate between color 1 & 2
-        }
+        _leds[i] = _blinkState ? _color1 : _color2;  //alternate between color 1 & 2
+      }
+    } else {
+      for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
+        _leds[i] = _color2;  //restore to default
       }
     }
   }
+}
+
+
+
+/*#####################################################*/
+/*####              HELPER FUNCTIONS               ####*/
+/*#####################################################*/
+void BlinkEffect::setBlinkDelay(uint16_t delay) {
+  _blinkDelay = delay;
+}
+
+uint16_t BlinkEffect::getBlinkDelay() {
+  return _blinkDelay;
 }

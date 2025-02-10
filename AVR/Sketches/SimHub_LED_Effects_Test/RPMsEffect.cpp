@@ -82,7 +82,6 @@ void RPMsEffect::update(uint16_t currentRPM) {
       //   _leds[(_ledCount - 1) - i] = _leds[i];
       // }
 
-      FastLED.show();
     }
   }
 }
@@ -101,3 +100,11 @@ int RPMsEffect::getRTLIndex(int i) {
   if (_rightToLeft) { index = _startPos + ((_startPos + _ledCount - 1) - i); }  //Draw Right to left
   return index;
 }
+
+  void RPMsEffect::setBlinkDelay(uint16_t delay) {
+    _blinkDelay = delay;
+  }
+
+  uint16_t RPMsEffect::getBlinkDelay() {
+    return _blinkDelay;
+  }

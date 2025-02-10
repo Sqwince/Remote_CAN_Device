@@ -4,6 +4,24 @@
 #include <FastLED.h>
 
 class BlinkEffect {
+private:
+  CRGB* _leds;           //pointer to LED strip
+  int _pattern;          //animation pattern
+  uint16_t _startPos;    //Starting LED
+  uint16_t _ledCount;    //Number of LEDs to include in effect
+  CRGB _color1;          //Color in CRGB format
+  CRGB _color2;          //Color in CRGB format
+  CRGB _color3;          //Color in CRGB format
+  uint16_t _blinkDelay;  //blink delay for redline blink animation
+
+  //State Variables
+  unsigned long _lastBlinkTime = 0;  // Last recorded blink time
+  bool _blinkState = false;          // State of blinking
+  bool _isActive = false;           //effect enabled by SimHub
+
+
+
+
 
 public:
   /* CONSTRUCTOR - TWO ALTERNATING PATTERNS */
@@ -25,27 +43,15 @@ public:
   */
   void update(bool enabled);
 
-  // void setBlinkDelay(uint16_t delay) {
-  //   _blinkDelay = delay;
-  // }
+  /*#####################################################*/
+  /*####              HELPER FUNCTIONS               ####*/
+  /*#####################################################*/
+  void setBlinkDelay(uint16_t delay); 
 
-  // uint16_t getBlinkDelay() {
-  //   return _blinkDelay;
-  // }
-private:
-  CRGB* _leds;           //pointer to LED strip
-  int _pattern;          //animation pattern
-  uint16_t _startPos;    //Starting LED
-  uint16_t _ledCount;    //Number of LEDs to include in effect
-  CRGB _color1;          //Color in CRGB format
-  CRGB _color2;          //Color in CRGB format
-  CRGB _color3;          //Color in CRGB format
-  uint16_t _blinkDelay;  //blink delay for redline blink animation
+  uint16_t getBlinkDelay();
 
-  //State Variables
-  unsigned long _lastBlinkTime = 0;  // Last recorded blink time
-  bool _blinkState = false;          // State of blinking
-  bool _isActive = false;           //effect enabled by SimHub
 };
+
+
 
 #endif  //END BLINKEFFECTS_H
