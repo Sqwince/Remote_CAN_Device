@@ -27,43 +27,33 @@ RPMsEffect::~RPMsEffect() {}
 void RPMsEffect::update(uint16_t currentRPM) {
 
   //currentRPM input value to LED indexes
-  uint16_t ledPosition = map(currentRPM, _minRPM, _maxRPM, _startPos, _ledCount * _dimmingSteps);
-  int fullyOnIndex = ledPosition / _dimmingSteps;  // Whole LED index
+  uint16_t ledPosition = map(currentRPM, _minRPM, _maxRPM, 0, _ledCount * _dimmingSteps);
+  int fullyOnIndex = _startPos + (ledPosition / _dimmingSteps);  // Whole LED index
   int fadeStep = ledPosition % _dimmingSteps;      // 0-3 step for fading
 
   bool isAtRedline = (currentRPM >= _maxRPM) ? true : false;
 
-
-
-  // int drawStart = _startPos;
-  // int drawEnd = _startPos + _ledCount;
-  // int drawInc = +1;
-  // //invert start/end for right to left drawing
-  // if (_rightToLeft) {
-  //   drawStart = +_ledCount;
-  //   drawEnd = _startPos;
-  //   drawInc = -1;
-  // }
-  // //split mirror hack
-  // for (int i = 0; i < half_LED_Num + 1; i++) {
-  //   _leds[(_ledCount - 1) - i] = _leds[i];
-  // }
-
   if (!isAtRedline) {
 
     // Define the color gradiant from StartColor to EndColor for the full LED strip
-    for (int i = _startPos; i < _ledCount; i++) {
-
-      // int index = i;                                         //Draw left to right (Default)
-      // if (!_rightToLeft) { index = ((_ledCount - 1) - i); }  //Draw Right to left
-
+    for (int i = _startPos; i < (_startPos + _ledCount); i++) {
       //Fill entire array with calculated colors
-      _leds[getRTLIndex(i)] = blend(_startColor, _endColor, (i * 255) / (_ledCount - 1));
+      ///// @param leds a pointer to the LED array to fill
+      /// @param startpos the starting position in the array
+      /// @param startcolor the starting color for the gradient
+      /// @param endpos the ending position in the array
+      /// @param endcolor the end color for the gradient
+      if (_rightToLeft) {
+        fill_gradient_RGB(_leds, (_startPos + _ledCount - 1), _startColor, _startPos, _endColor);
+      } else {
+        fill_gradient_RGB(_leds, _startPos, _startColor, (_startPos + _ledCount - 1), _endColor);
+        //_leds[getRTLIndex(i)] = blend(_startColor, _endColor, (i * 255) / (_ledCount - 1));
+      }
     }
 
 
     // Adjust brightness
-    for (int i = _startPos; i < _ledCount; i++) {
+    for (int i = _startPos; i < (_startPos + _ledCount); i++) {
       if (i < fullyOnIndex) {
         _leds[getRTLIndex(i)].maximizeBrightness();  // Fully on
       } else if (i == fullyOnIndex) {
@@ -82,8 +72,8 @@ void RPMsEffect::update(uint16_t currentRPM) {
       _blinkState = !_blinkState;
       _lastBlinkTime = currentBlinkMillis;
 
-      for (int i = _startPos; i < _ledCount; i++) {
-        _leds[getRTLIndex(i)] = _blinkState ? _redlineColor1 : _redlineColor2;  //alternate between RLcolor 1 & 2
+      for (int i = _startPos; i < (_startPos + _ledCount); i++) {
+        _leds[i] = _blinkState ? _redlineColor1 : _redlineColor2;  //alternate between RLcolor 1 & 2
       }
 
 
@@ -98,12 +88,16 @@ void RPMsEffect::update(uint16_t currentRPM) {
 }
 
 
-  /**
+
+/*#####################################################*/
+/*####              HELPER FUNCTIONS               ####*/
+/*#####################################################*/
+/**
     * @brief returns the LED array index based on draw direction
     * @param index of element in LED array
   */
-  int RPMsEffect::getRTLIndex(int i) {
-      int index = i; //Draw left to right (Default)                             
-      if (!_rightToLeft) { index = ((_ledCount - 1) - i); }  //Draw Right to left
-     return index;
-  }
+int RPMsEffect::getRTLIndex(int i) {
+  int index = i;                                                                //Draw left to right (Default)
+  if (_rightToLeft) { index = _startPos + ((_startPos + _ledCount - 1) - i); }  //Draw Right to left
+  return index;
+}

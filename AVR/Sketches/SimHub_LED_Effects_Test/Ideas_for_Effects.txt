@@ -1,0 +1,6 @@
+scrolling effect:
+1) engine start type animation 
+    number of lit 
+    space between leds
+    speed of update
+    dimming on leading & trailing edges

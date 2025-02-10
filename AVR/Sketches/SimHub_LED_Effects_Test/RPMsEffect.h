@@ -51,20 +51,29 @@ public:
   ~RPMsEffect();  //Destructor
 
 
+  void setBlinkDelay(uint16_t delay) {
+    _blinkDelay = delay;
+  }
+
+  uint16_t getBlinkDelay() {
+    return _blinkDelay;
+  }
+
   /**
     * @brief Calculates the LED colors based on currentRPMs value
     * @param currentRPM RPMs value (0-100%) for the effect
   */
   void update(uint16_t currentRPM);
 
-
-
+  //TODO: move to separate helper .h/.cpp
+  /*#####################################################*/
+  /*####              HELPER FUNCTIONS               ####*/
+  /*#####################################################*/
   /**
     * @brief returns the LED array index based on draw direction
     * @param index of element in LED array
   */
   int getRTLIndex(int index);
-
 };
 
 
