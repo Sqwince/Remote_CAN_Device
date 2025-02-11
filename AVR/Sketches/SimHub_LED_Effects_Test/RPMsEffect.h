@@ -8,29 +8,6 @@
 #include "BlinkEffect.h"
 
 class RPMsEffect {
-private:
-  CRGB* _leds;               //pointer to LED strip
-  bool _rightToLeft;         //animation direction
-  uint16_t _startPos;        //Starting LED
-  uint16_t _ledCount;        //Number of LEDs to include in effect
-  CRGB _startColor;          //Starting Color in CRGB format
-  CRGB _endColor;            //Ending color in CRGB format
-  uint16_t _minRPM;          //minimum RPM value (Default: 0%)
-  uint16_t _maxRPM;          //maximum RPM value (Default: 100%)
-  bool _redlineBlink;        //blink Color 1 & 2 when RPM = 100%
-  CRGB _redlineColor1;       //Color 1 of RPM Redline animation blink
-  CRGB _redlineColor2;       //Color 2 of PRM redline animation blink
-  BlinkEffect redlineBlink;  //blinkeffect object
-
-  //default effect (can be updated with functions later)
-  uint16_t _blinkDelay = 100;  //blink delay for redline blink animation
-  bool _useDimming = true;     //fade last LED
-  uint8_t _dimmingSteps = 8;   //Number of steps to use for dimming function
-
-  //Redline Blink State Variables
-  unsigned long _lastBlinkTime = 0;  // Last recorded blink time
-  bool _blinkState = false;          // State of blinking for redline alert
-
 public:
 
   /* CONSTRUCTOR */
@@ -81,7 +58,30 @@ public:
     * @brief returns the LED array index based on draw direction
     * @param index of element in LED array
   */
-  int getRTLIndex(int index);
+  uint16_t getRTLIndex(uint16_t index);
+
+private:
+  CRGB* _leds;               //pointer to LED strip
+  bool _rightToLeft;         //animation direction
+  uint16_t _startPos;        //Starting LED
+  uint16_t _ledCount;        //Number of LEDs to include in effect
+  CRGB _startColor;          //Starting Color in CRGB format
+  CRGB _endColor;            //Ending color in CRGB format
+  uint16_t _minRPM;          //minimum RPM value (Default: 0%)
+  uint16_t _maxRPM;          //maximum RPM value (Default: 100%)
+  bool _redlineBlink;        //blink Color 1 & 2 when RPM = 100%
+  CRGB _redlineColor1;       //Color 1 of RPM Redline animation blink
+  CRGB _redlineColor2;       //Color 2 of PRM redline animation blink
+  BlinkEffect redlineBlink;  //blinkeffect object
+
+  //default effect (can be updated with functions later)
+  uint16_t _blinkDelay = 100;  //blink delay for redline blink animation
+  bool _useDimming = true;     //fade last LED
+  uint8_t _dimmingSteps = 8;   //Number of steps to use for dimming function
+
+  //Redline Blink State Variables
+  unsigned long _lastBlinkTime = 0;  // Last recorded blink time
+  bool _blinkState = false;          // State of blinking for redline alert
 };
 
 #endif  //SH_EFFECTS_H

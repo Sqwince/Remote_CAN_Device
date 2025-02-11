@@ -1,13 +1,14 @@
 #include <FastLED.h>
 #include "RPMsEffect.h"  //extend FastLED library for SimHum RGB LED Effects
 #include "BlinkEffect.h"
+#include "ScrollEffect.h"
 
 #define NUM_LEDS 18
 #define DATA_PIN 6
 #define DIMMING_STEPS 8
 #define MAX_BRIGHTNESS 10   //maximum brightness [0-255]
 #define DEBUG_ENABLED true  //serial output messages
-#define REFRESH_RATE 50     //RefreshRate [10 FPS]
+#define REFRESH_RATE 20     //RefreshRate [10 FPS]
 #define POT_PIN A1          //Potentiometer input to represent RPMs
 #define BUTTON_PIN 10       //Push Button input for testing flags
 
@@ -17,8 +18,8 @@ const long refreshRateDelayInMillis = ((1 / REFRESH_RATE) * 1000);  //HID Pollin
 //LED strip as array of CRGB colors for FastLED lib
 CRGB leds[NUM_LEDS];
 
-
-//RPMs effect arguments
+/*#############################################################################*/
+/* RPMs EFFECT with redline flashing animation */
 //CRGB *leds          //pointer to LED strip
 //bool rightToLeft    //animation direction
 //uint16_t startPos   //Starting LED
@@ -32,10 +33,10 @@ CRGB leds[NUM_LEDS];
 //CRGB redlineColor2  //Color 2 of PRM redline animation blink
 
 /*EXAMPLE: RPMs EFFECT 0-100% with Redline Animation */
-RPMsEffect RPMs_Left(leds, false, 3, 6, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Red, CRGB::Blue);
-RPMsEffect RPMs_Right(leds, true, 9, 6, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Blue, CRGB::Red);
+//RPMsEffect RPMs_Left(leds, false, 3, 6, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Red, CRGB::Blue);
+//RPMsEffect RPMs_Right(leds, true, 9, 6, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Blue, CRGB::Red);
 
-
+/*#############################################################################*/
 /* Blink EFFECT Animations */
 // CRGB* leds,                  //pointer to LED strip
 //blinkPattern pattern,        //animation pattern
@@ -47,17 +48,32 @@ RPMsEffect RPMs_Right(leds, true, 9, 6, CRGB::Green, CRGB::Red, 0, 100, true, CR
 //uint16_t blinkDelay = 100);  //blink delay for redline blink animation (Default = 100ms)
 
 /*EXAMPLE: Yellow Flag EFFECT Blink Animation */
-BlinkEffect yellowFlag1(leds, BlinkEffect::flashing, 0, 3, CRGB::Yellow, CRGB::Black);
-BlinkEffect yellowFlag2(leds, BlinkEffect::flashing, 15, 3, CRGB::Yellow, CRGB::Black);
+//BlinkEffect yellowFlag1(leds, BlinkEffect::flashing, 0, 3, CRGB::Yellow, CRGB::Black);
+//BlinkEffect yellowFlag2(leds, BlinkEffect::flashing, 15, 3, CRGB::Yellow, CRGB::Black);
 
 //Blink effects testing for all animations
 // BlinkEffect blink1(leds, BlinkEffect::flashing, 0, 6, CRGB::Red, CRGB::Green);
 // BlinkEffect blink2(leds, BlinkEffect::alternateTwo, 6, 6, CRGB::Orange, CRGB::Blue);
 // BlinkEffect blink3(leds, BlinkEffect::alternateThree, 12, 6, CRGB::Yellow, CRGB::Purple, CRGB::Black);
+/*#############################################################################*/
+/* Scrolling EFFECT Animations */
+// CRGB* leds,                  //pointer to LED strip
+//bool rightToLeft,            //animation direction
+//ScrollPattern pattern,       //selected animation for effect
+//uint16_t startPos,           //Starting LED
+//uint16_t ledCount,           //Number of LEDs to include in effect
+//uint16_t ledSpacing,         //distance between lit LEDs (between 1 and ledCount)
+//CRGB color1,                 //Color in CRGB format
+//CRGB color2,                 //Color in CRGB format
+//uint16_t scrollSpeed = 50);  //how fast to scroll the effect
 
-
+ScrollEffect scroll(leds, false, ScrollEffect::chase, 0, 18, 3, CRGB::Blue, CRGB::Black);
 
 /*#############################################################################*/
+
+/*#############################################*/
+/*######              SETUP              ######*/
+/*#############################################*/
 void setup() {
 
   //debugger
@@ -76,10 +92,10 @@ void setup() {
   FastLED.show();                         //refresh strip
 
   //[OPTIONAL]Set blink delay (default 100ms)
-  RPMs_Left.setBlinkDelay(100);
-  RPMs_Right.setBlinkDelay(100);
-  yellowFlag1.setBlinkDelay(250);
-  yellowFlag2.setBlinkDelay(250);
+  // RPMs_Left.setBlinkDelay(100);
+  // RPMs_Right.setBlinkDelay(100);
+  // yellowFlag1.setBlinkDelay(250);
+  // yellowFlag2.setBlinkDelay(250);
 
   //for blink animation testing:
   // blink1.setBlinkDelay(250);
@@ -87,7 +103,10 @@ void setup() {
   // blink3.setBlinkDelay(250);
 }
 
-/*#############################################################################*/
+
+/*#############################################*/
+/*######              LOOP               ######*/
+/*#############################################*/
 void loop() {
   /* Timer */
   unsigned long currentMillis = millis();
@@ -105,14 +124,16 @@ void loop() {
     bool state = digitalRead(BUTTON_PIN);
 
     //Update Effect(s)
-    RPMs_Left.update(rpmPercentage);
-    RPMs_Right.update(rpmPercentage);
-    yellowFlag1.update(state);
-    yellowFlag2.update(state);
+    // RPMs_Left.update(rpmPercentage);
+    // RPMs_Right.update(rpmPercentage);
+    // yellowFlag1.update(state);
+    // yellowFlag2.update(state);
 
     // blink1.update(state);
     // blink2.update(state);
     // blink3.update(state);
+
+    scroll.update(state);
 
     //DRAW LEDs
     FastLED.show();

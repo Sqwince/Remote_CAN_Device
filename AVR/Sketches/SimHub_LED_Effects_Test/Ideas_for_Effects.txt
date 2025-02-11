@@ -3,4 +3,4 @@ scrolling effect:
     number of lit 
     space between leds
     speed of update
-    dimming on leading & trailing edges
+    dimming on leading & trailing edges (blur)

@@ -28,15 +28,15 @@ void RPMsEffect::update(uint16_t currentRPM) {
 
   //currentRPM input value to LED indexes
   uint16_t ledPosition = map(currentRPM, _minRPM, _maxRPM, 0, _ledCount * _dimmingSteps);
-  int fullyOnIndex = _startPos + (ledPosition / _dimmingSteps);  // Whole LED index
-  int fadeStep = ledPosition % _dimmingSteps;                    // 0-3 step for fading
+  uint16_t fullyOnIndex = _startPos + (ledPosition / _dimmingSteps);  // Whole LED index
+  uint16_t fadeStep = ledPosition % _dimmingSteps;                    // 0-3 step for fading
 
   bool isAtRedline = (currentRPM >= _maxRPM) ? true : false;
 
   if (!isAtRedline) {
 
     // Define the color gradiant from StartColor to EndColor for the full LED strip
-    for (int i = _startPos; i < (_startPos + _ledCount); i++) {
+    for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
       //Fill entire array with calculated colors
       ///// @param leds a pointer to the LED array to fill
       /// @param startpos the starting position in the array
@@ -53,7 +53,7 @@ void RPMsEffect::update(uint16_t currentRPM) {
 
 
     // Adjust brightness
-    for (int i = _startPos; i < (_startPos + _ledCount); i++) {
+    for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
       if (i < fullyOnIndex) {
         _leds[getRTLIndex(i)].maximizeBrightness();  // Fully on
       } else if (i == fullyOnIndex) {
@@ -77,8 +77,8 @@ void RPMsEffect::update(uint16_t currentRPM) {
     * @brief returns the LED array index based on draw direction
     * @param index of element in LED array
   */
-int RPMsEffect::getRTLIndex(int i) {
-  int index = i;                                                                //Draw left to right (Default)
+uint16_t RPMsEffect::getRTLIndex(uint16_t i) {
+  uint16_t index = i;                                                                //Draw left to right (Default)
   if (_rightToLeft) { index = _startPos + ((_startPos + _ledCount - 1) - i); }  //Draw Right to left
   return index;
 }
