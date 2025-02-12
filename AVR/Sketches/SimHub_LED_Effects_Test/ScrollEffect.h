@@ -10,22 +10,23 @@ class ScrollEffect {
 public:
   /* ANIMATION PATTERNS */
   enum ScrollPattern {
-    chase,           //LEDs chassing color1 & color2 -> 2|1|1, 1|2|1, 1|1|2
-    chaseDimmed,     //LEDs chassing color1 & color2 with dimming blur -> 2|1|1, 1|2|1, 1|1|2
-    alternateThree,  //Even/Odd flip-flop animation between 3 colors         -> 1|3|1, 3|2|3, 1|3|1
+    chase,          //LEDs chassing color1 & color2 -> 1|2|2, 2|1|2, 2|2|1
+    invertedChase,  //LEDs chassing color1 & color2 -> 2|1|1, 1|2|1, 1|1|2
+    chaseDimmed     //LEDs chassing color1 & color2 with dimming blur -> 2|1|1, 1|2|1, 1|1|2
+
   };
 
 
   /* CONSTRUCTOR */
-  ScrollEffect(CRGB* leds,                  //pointer to LED strip
-                  bool rightToLeft,            //animation direction
-                  ScrollPattern pattern,       //selected animation for effect
-                  uint16_t startPos,           //Starting LED
-                  uint16_t ledCount,           //Number of LEDs to include in effect
-                  uint16_t ledSpacing,         //distance between lit LEDs (between 1 and ledCount)
-                  CRGB color1,                 //Color in CRGB format
-                  CRGB color2,                 //Color in CRGB format
-                  uint16_t scrollSpeed = 100);  //how fast to scroll the effect
+  ScrollEffect(CRGB* leds,                   //pointer to LED strip
+               bool rightToLeft,             //animation direction
+               ScrollPattern pattern,        //selected animation for effect
+               uint16_t startPos,            //Starting LED
+               uint16_t ledCount,            //Number of LEDs to include in effect
+               uint16_t ledSpacing,          //distance between lit LEDs (between 1 and ledCount)
+               CRGB color1,                  //Color in CRGB format
+               CRGB color2,                  //Color in CRGB format
+               uint16_t scrollSpeed = 100);  //how fast to scroll the effect
 
 
   /** Destructor
@@ -33,10 +34,18 @@ public:
      */
   ~ScrollEffect();  //Destructor
 
-  /** Destructor
+  /** 
     * @brief updates scrolling effect 
+    * @param enabled turns effect on/off
     */
   void update(bool enabled);
+
+  /** 
+    * @brief updates scrolling effect 
+    * @param delay delay in ms between scroll timer updates
+    */
+  void setScrollSpeed(uint16_t delay);
+
 
 
 private:
@@ -53,9 +62,9 @@ private:
 
 
   //Animation State variables
-  bool _useDimming = true;          //fade last LED
-  uint8_t _dimmingSteps = 8;        //Number of steps to use for dimming function
-  unsigned long _previousMillis = 0; //scroll timer
+  //bool _useDimming = true;            //fade last LED
+  unsigned long _previousMillis = 0;  //scroll timer
+  uint8_t _dimmingSteps = 2;          //Number of steps to use for dimming function
   uint16_t _currentScrollStep = 0;  // keeps track of where the scrolling led is
   uint16_t _totalSteps;
 };

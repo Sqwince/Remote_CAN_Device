@@ -37,12 +37,8 @@ void RPMsEffect::update(uint16_t currentRPM) {
 
     // Define the color gradiant from StartColor to EndColor for the full LED strip
     for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
+ 
       //Fill entire array with calculated colors
-      ///// @param leds a pointer to the LED array to fill
-      /// @param startpos the starting position in the array
-      /// @param startcolor the starting color for the gradient
-      /// @param endpos the ending position in the array
-      /// @param endcolor the end color for the gradient
       if (_rightToLeft) {
         fill_gradient_RGB(_leds, (_startPos + _ledCount - 1), _startColor, _startPos, _endColor);
       } else {
@@ -50,7 +46,6 @@ void RPMsEffect::update(uint16_t currentRPM) {
         //_leds[getRTLIndex(i)] = blend(_startColor, _endColor, (i * 255) / (_ledCount - 1));
       }
     }
-
 
     // Adjust brightness
     for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {

@@ -61,6 +61,28 @@ void ScrollEffect::update(bool enabled) {
           break;
         }  //break included in enabled loop to fall to default when !enabled
 
+        /*##########################################################*/
+        // single LEDs CHASING with set spacing  >>2|1|2|2|2|1|2>> */
+        /*##########################################################*/
+      case invertedChase:
+        if (enabled) {
+          //.oO|Oo.//
+          //total steps = number of fadesteps + fullyOn + fadestep number
+          for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
+
+            //Draw direction
+            uint16_t index = i;                                                           //Draw left to right (Default)
+            if (_rightToLeft) { index = _startPos + ((_startPos + _ledCount - 1) - i); }  //Draw Right to left
+
+            //update LED strip
+            _leds[index] = ((i + _currentScrollStep) % _ledSpacing == 0) ? _color2 : _color1;
+          }
+          _currentScrollStep++;  //Next LED step
+          break;
+        }  //break included in enabled loop to fall to default when !enabled
+
+
+
 
         /*##########################################################*/
         // single LEDs CHASING with set spacing  >>2|1|2|2|2|1|2>> */
@@ -68,37 +90,66 @@ void ScrollEffect::update(bool enabled) {
       case chaseDimmed:
         if (enabled) {
 
-          fill_gradient_RGB(_leds, _startPos, _color1, (_startPos + _ledCount), _color2);
+          //ledPosition equiv:
+          _currentScrollStep = (_currentScrollStep + 1) % (_ledCount * _dimmingSteps);
+          uint16_t fullyOnIndex = _startPos + (_currentScrollStep / _dimmingSteps);
+          uint16_t fadeStep = _currentScrollStep % _dimmingSteps;
 
-        };  //Next LED step
+          //.oO|Oo.//
+          //total steps = number of fadesteps + fullyOn + fadestep number
+          // Loop through LEDs to apply effect
+          for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
+
+            // Determine the index based on direction
+            uint16_t index = i;                                                           //Draw left to right (Default)
+            if (_rightToLeft) { index = _startPos + ((_startPos + _ledCount - 1) - i); }  //Draw Right to left
+
+            // Calculate the distance from the fullyOnIndex
+            int16_t distance = abs((int16_t)i - (int16_t)fullyOnIndex);
+
+            // Apply full brightness to the center LED
+            if (distance == 0) {
+              _leds[index] = _color1;
+              _leds[index].maximizeBrightness();
+            }
+
+            // Apply gradient brightness to adjacent LEDs
+            else if (distance < _dimmingSteps) {
+              uint8_t brightness = 255 - (distance * (255 / _dimmingSteps));  // Gradual dimming
+              _leds[index] = _color1;
+              _leds[index].fadeToBlackBy(255 - brightness);  // Adjust brightness
+            }
+
+            // Turn off other LEDs
+            else {
+              _leds[index] = _color2;
+            }
+          }
+          _currentScrollStep++;  //Next LED step
+          break;
+        }  //break included in enabled loop to fall to default when !enabled
+
+
+
+
+        /*###############################################################################*/
+        /*          DEFAULT STATE - ALL SET TO COLOR3                                    */
+        /*###############################################################################*/
+      default:
+        //Restore LEDs to default state
+        for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
+          _leds[i] = _color2;  //restore to default
+        }
         break;
-    }  //break included in enabled loop to fall to default when !enabled
-
-        /*##########################################################*/
-        // single LEDs CHASING with set spacing  >>2|1|2|2|2|1|2>> */
-        /*##########################################################*/
-      case chaseDimmed:
-        if (enabled) {
-
-          fill_gradient_RGB(_leds, _startPos, _color1, (_startPos + _ledCount), _color2);
-
-        };  //Next LED step
-        break;
-    }  //break included in enabled loop to fall to default when !enabled
-
-
-      /*###############################################################################*/
-      /*          DEFAULT STATE - ALL SET TO COLOR3                                    */
-      /*###############################################################################*/
-    default:
-      //Restore LEDs to default state
-      for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
-        _leds[i] = _color2;  //restore to default
-      }
-      break;
+    };
   }
 }
+
+
+void ScrollEffect::setScrollSpeed(uint16_t delay) {
+  _scrollSpeed = delay;
 }
+
 
 
 /*

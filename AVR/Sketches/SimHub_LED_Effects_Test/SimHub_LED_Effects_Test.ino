@@ -67,7 +67,7 @@ CRGB leds[NUM_LEDS];
 //CRGB color2,                 //Color in CRGB format
 //uint16_t scrollSpeed = 50);  //how fast to scroll the effect
 
-ScrollEffect scroll(leds, false, ScrollEffect::chase, 0, 18, 3, CRGB::Blue, CRGB::Black);
+ScrollEffect scroll(leds, false, ScrollEffect::chaseDimmed, 0, 18, 3, CRGB::Blue, CRGB::Black);
 
 /*#############################################################################*/
 
@@ -101,6 +101,8 @@ void setup() {
   // blink1.setBlinkDelay(250);
   // blink2.setBlinkDelay(250);
   // blink3.setBlinkDelay(250);
+
+  scroll.setScrollSpeed(50);
 }
 
 
@@ -133,7 +135,7 @@ void loop() {
     // blink2.update(state);
     // blink3.update(state);
 
-    scroll.update(state);
+    scroll.update(true);
 
     //DRAW LEDs
     FastLED.show();
