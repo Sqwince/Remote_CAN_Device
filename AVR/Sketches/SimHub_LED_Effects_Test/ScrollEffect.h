@@ -12,7 +12,8 @@ public:
   enum ScrollPattern {
     chase,          //LEDs chassing color1 & color2 -> 1|2|2, 2|1|2, 2|2|1
     invertedChase,  //LEDs chassing color1 & color2 -> 2|1|1, 1|2|1, 1|1|2
-    chaseDimmed     //LEDs chassing color1 & color2 with dimming blur -> 2|1|1, 1|2|1, 1|1|2
+    chaseDimmed1,     //LEDs chassing color1 & color2 with dimming blur -> 2|1|1, 1|2|1, 1|1|2
+    chaseDimmed2
 
   };
 
@@ -64,7 +65,7 @@ private:
   //Animation State variables
   //bool _useDimming = true;            //fade last LED
   unsigned long _previousMillis = 0;  //scroll timer
-  uint8_t _dimmingSteps = 2;          //Number of steps to use for dimming function
+  uint8_t _dimmingSteps = 12;          //Number of steps to use for dimming function
   uint16_t _currentScrollStep = 0;  // keeps track of where the scrolling led is
   uint16_t _totalSteps;
 };

@@ -87,50 +87,60 @@ void ScrollEffect::update(bool enabled) {
         /*##########################################################*/
         // single LEDs CHASING with set spacing  >>2|1|2|2|2|1|2>> */
         /*##########################################################*/
-      case chaseDimmed:
+      case chaseDimmed1:
         if (enabled) {
 
-          //ledPosition equiv:
+          //ledPosition equiv:                            (total "steps" in the loop)
           _currentScrollStep = (_currentScrollStep + 1) % (_ledCount * _dimmingSteps);
-          uint16_t fullyOnIndex = _startPos + (_currentScrollStep / _dimmingSteps);
-          uint16_t fadeStep = _currentScrollStep % _dimmingSteps;
+          uint16_t fullyOnIndex = _startPos + (_currentScrollStep / _dimmingSteps);  // Whole LED index
+          uint16_t fadeStep = _currentScrollStep % _dimmingSteps;                    // 0-3 step for fading
 
-          //.oO|Oo.//
-          //total steps = number of fadesteps + fullyOn + fadestep number
-          // Loop through LEDs to apply effect
+          //fill with color1
           for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
-
-            // Determine the index based on direction
-            uint16_t index = i;                                                           //Draw left to right (Default)
-            if (_rightToLeft) { index = _startPos + ((_startPos + _ledCount - 1) - i); }  //Draw Right to left
-
-            // Calculate the distance from the fullyOnIndex
-            int16_t distance = abs((int16_t)i - (int16_t)fullyOnIndex);
-
-            // Apply full brightness to the center LED
-            if (distance == 0) {
-              _leds[index] = _color1;
-              _leds[index].maximizeBrightness();
-            }
-
-            // Apply gradient brightness to adjacent LEDs
-            else if (distance < _dimmingSteps) {
-              uint8_t brightness = 255 - (distance * (255 / _dimmingSteps));  // Gradual dimming
-              _leds[index] = _color1;
-              _leds[index].fadeToBlackBy(255 - brightness);  // Adjust brightness
-            }
-
-            // Turn off other LEDs
-            else {
-              _leds[index] = _color2;
-            }
+            _leds[i] = _color2;
           }
-          _currentScrollStep++;  //Next LED step
+
+          // Adjust brightness for trailing and leading edges
+          if (fullyOnIndex > _startPos) {
+            //uint8_t trailingBrightness = map(fadeStep, 0, _dimmingSteps - 1, 255, 0);  // linear Fade out
+            //uint8_t trailingBrightness = 255 * pow(float(fadeStep) / (_dimmingSteps - 1), 2); //Exponential fade out
+            uint8_t trailingBrightness = 125 * (1 - pow(float(fadeStep) / (_dimmingSteps - 1), 2));  // Exponential fade out
+            _leds[fullyOnIndex - 1] = _color1;
+            _leds[fullyOnIndex - 1].nscale8(trailingBrightness);
+
+          }
+
+          // Adjust brightness for the leading edge
+          if (fullyOnIndex < _startPos + _ledCount) {
+            //uint8_t leadingBrightness = map(fadeStep, 0, _dimmingSteps - 1, 0, 255);  //Linear Fade in
+            uint8_t leadingBrightness = 125 * (1 - pow(1 - float(fadeStep) / (_dimmingSteps - 1), 2));  // Exponential fade in
+            _leds[fullyOnIndex] = _color1;
+            _leds[fullyOnIndex].nscale8(leadingBrightness);
+          }
           break;
         }  //break included in enabled loop to fall to default when !enabled
 
 
+      /*##########################################################*/
+        // single LEDs CHASING with set spacing  >>2|1|2|2|2|1|2>> */
+        /*##########################################################*/
+      case chaseDimmed2:
+        if (enabled) {
 
+          //ledPosition equiv:                            (total "steps" in the loop)
+          _currentScrollStep = (_currentScrollStep + 1) % (_ledCount * _dimmingSteps);
+          uint16_t fullyOnIndex = _startPos + (_currentScrollStep / _dimmingSteps);  // Whole LED index
+          uint16_t fadeStep = _currentScrollStep % _dimmingSteps;                    // 0-3 step for fading
+
+          //fill with color1
+          for (uint16_t i = _startPos; i < (_startPos + _ledCount); i++) {
+            _leds[i] = _color2;
+          }
+            _leds[fullyOnIndex] = _color1;
+            blur1d(_leds,18,125);
+          
+          break;
+        }
 
         /*###############################################################################*/
         /*          DEFAULT STATE - ALL SET TO COLOR3                                    */
