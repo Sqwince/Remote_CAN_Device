@@ -1,7 +1,7 @@
 #ifndef BLINKEFFECT_H
 #define BLINKEFFECT_H
 
-#include <FastLED.h>
+#include "FastLED.h"
 
 class BlinkEffect {
 public:

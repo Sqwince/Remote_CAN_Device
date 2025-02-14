@@ -1,4 +1,4 @@
-#include <FastLED.h>
+#include "FastLED.h"
 #include "RPMsEffect.h"  //extend FastLED library for SimHum RGB LED Effects
 #include "BlinkEffect.h"
 #include "ScrollEffect.h"

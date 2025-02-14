@@ -1,7 +1,7 @@
 #ifndef SCROLLINGEFFECT_H
 #define SCROLLINGEFFECT_H
 
-#include <FastLED.h>
+#include "FastLED.h"
 
 /// @file ScrollingEffect.h
 /// Utility functions for color fill, palettes, blending, and more

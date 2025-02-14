@@ -4,7 +4,7 @@
 /// @file RPMsEffect.h
 /// Utility functions for color fill, palettes, blending, and more
 
-#include <FastLED.h>
+#include "FastLED.h"
 #include "BlinkEffect.h"
 
 class RPMsEffect {
