@@ -2,8 +2,17 @@
 ========================================
 Description: Reads Analog & Digital inputs 
 and reports states over CAN to OpenFFBoard-Main
-which hosts the motor driver and single interface
-to the PC.
+which hosts the motor driver and provides a 
+single interface to the PC.
+
+Supports OpenFFB SPI Buttons,
+ Analog Axis (joystick, pedals, etc),
+ and up to 4 rotary knob encoders
+
+
+KNOWN ISSUE: Each Rotary encoder will consume 2 digital outputs from the SPI Buttons.
+Unable to map more than 32 outputs to HID for some reason at the moment even
+though the CAN digital frame supposedly supports up to 64 inputs.
 
 AUTHOR: Sqwince
 VERSION: 0.1
@@ -34,10 +43,10 @@ SOFTWARE.
 */
 #include <Arduino.h>
 #include "Config.h"
-#include "ShiftIn.h"    //https://github.com/InfectedBytes/ArduinoShiftIn
-#include "STM32_CAN.h"  //https://github.com/pazi88/STM32_CAN
-#include "Encoder.h"
-#include "Error_Handler.h"
+#include "ShiftIn.h"        //https://github.com/InfectedBytes/ArduinoShiftIn
+#include "STM32_CAN.h"      //https://github.com/pazi88/STM32_CAN
+#include "Encoder.h"        //https://chome.nerpa.tech/mcu/reading-rotary-encoder-on-arduino/
+#include "Error_Handler.h"  //Sqwince
 
 
 //(OpenFFBoard-main v1.2.4, Pins:CAN_RX=PD0 | CAN_TX=PD1, RX Buffer size = 8MB)
@@ -56,7 +65,7 @@ Encoder encoder2(ENC2_A_PIN, ENC2_B_PIN, ENCODER_PULSE_MS);
 /*###############################################*/
 void setup() {
 // Initialize serial communication for debugging
-#if defined(DEBUG_ENABLED)
+#if (DEBUG_ENABLED == true)
   Serial.begin(115200);
   Serial.println("Serial initialized.");
 #endif
@@ -69,20 +78,20 @@ void setup() {
   // Initialize CAN bus
   Can.begin();
   Can.setBaudRate(CAN_SPEED);
-#if defined(DEBUG_ENABLED)
+#if (DEBUG_ENABLED == true)
   Serial.println("CAN initialized.");
 #endif
 
   /* INIIALIZE DIGITAL INPUTS */
-  if (SPI_BUTTON_BOARDS > 0) {
+  if ((SPI_BUTTON_BOARDS > 0) || (ROTARY_ENCODER_COUNT > 0)) {
     DIGITAL_INPUTS_ENABLED = true;
     //Initalize SPI port: pLoadPin, clockEnablePin, dataPin, clockPin
     shift.begin(SPI2_CS_PIN, SPI2_MISO_PIN, SPI2_SCK_PIN);
     FrameCount++;  //Single frame is used for up to 64 digital Buttons
   }
 
-  /* INITIALIZE ENCODERS*/
-  //(Supports up to 4 onboard Digital Inputs)
+  /* INITIALIZE ROTARY KNOB ENCODERS*/
+  //(Supports up to 4 encoders read through onboard Digital Inputs 1-8)
   encoder1.begin();
   encoder2.begin();
 
@@ -107,7 +116,7 @@ void setup() {
     }
   }
 
-  /* Set Timing */
+  /* Calculate Polling Timing */
   //Time between each CAN Frame in ms = (1/120Hz * 1000ms/sec) / (1,2,3)
   CAN_Frame_interval = (((1 / POLLING_FREQUENCY) * 1000) / (FrameCount));
 }
@@ -125,6 +134,7 @@ void loop() {
   // encoder3.update();
   // encoder4.update();
 
+ //Update RGBLEDs here:
 
 
   /*Input Polling Timer*/
@@ -132,9 +142,12 @@ void loop() {
   if (currentMillis - previousMillis >= CAN_Frame_interval) {
     previousMillis = currentMillis;  //save last time polled.
 
-    uint8_t enc1_dir = encoder1.getState();  //0000 0011
-    uint8_t enc2_dir = encoder2.getState();  //0000 1100
+    uint8_t enc1_dir = encoder1.getState();
+    uint8_t enc2_dir = encoder2.getState();
+    // uint8_t enc3_dir = encoder3.getState();
+    // uint8_t enc4_dir = encoder4.getState();
 
+    //Intended for troubleshooting feedback when debug is disabled (to be removed)
     if (enc1_dir == 1 || enc2_dir == 1) {
       digitalWrite(LED_RED_Pin, HIGH);
       digitalWrite(LED_BLU_Pin, LOW);
@@ -149,7 +162,7 @@ void loop() {
       digitalWrite(LED_RED_Pin, LOW);
     }
 
-
+    //Next Frame
     FrameIndex = (FrameIndex + 1) % FrameCount;  //Cycles through 0, 1, 2 (depending on how many frames needed)
 
     CAN_message_t CAN_Msg;
@@ -157,6 +170,7 @@ void loop() {
 
     //For which CAN Frame to send (0:Digital 1:64[100], 1:Analog 1:4[110], 2:Analog 5:6[111])
     switch (FrameIndex) {
+        /*#######################################################################*/
       case digitalInputs:  // READ DIGITAL BUTTON DATA
         {
           if (DIGITAL_INPUTS_ENABLED) {
@@ -225,18 +239,24 @@ void loop() {
         }
     }
 
+    /*#######################################################################*/
     //Just gonna send it!!! (https://www.youtube.com/watch?v=RSuLFvalhnQ)
-    if (Can.write(CAN_Msg)) {
-      if (DEBUG_ENABLED) {
-        Serial.print("CAN ID: ");
-        Serial.print(CAN_Msg.id);
-        Serial.print(" | Data: |");
-        for (int i = 0; i < CAN_Msg.len; i++) {
-          Serial.print(CAN_Msg.buf[i], HEX);
-          Serial.print("|");
-        }
-        Serial.println("");
+    bool CAN_status = Can.write(CAN_Msg);
+
+    if (CAN_status) {
+      error_handler.clearError();
+
+#if ((DEBUG_ENABLED == true) && (DEBUG_CAN_MSGS == true))
+      Serial.print("CAN ID: ");
+      Serial.print(CAN_Msg.id);
+      Serial.print(" | Data: |");
+      for (int i = 0; i < CAN_Msg.len; i++) {
+        //Serial.print(CAN_Msg.buf[i], HEX);
+        Serial.printf("%02X", CAN_Msg.buf[i]);  //zero padded two places
+        Serial.print("|");
       }
+      Serial.println("");
+#endif
     } else {
       error_handler.handleError(errorCode_CAN_Send_Fail);
     }
@@ -247,7 +267,7 @@ void loop() {
 /*#######          HELPER FUNCTIONS       #######*/
 /*###############################################*/
 
-//Insert s16b value into CAN Msg Buffer
+/* Insert s16b value into CAN Msg Buffer */
 bool Append_s16(CAN_message_t* msg, int16_t val) {
   size_t start_byte = msg->len;
   if ((start_byte + 2) > 8) return false;        // can't add more data, message is full
@@ -271,13 +291,13 @@ int16_t readAnalogInput(uint32_t ainPin) {
   return val;
 }
 
-//Insert Button values into the CAN Msg Buffer
+/*Insert Button values into the CAN Msg Buffer*/
 template<uint8_t N>
 bool Append_BTN_States(CAN_message_t* _msg, ShiftIn<N>* _shift) {
   uint64_t val = _shift->read();  // Read button values as 64-bit integer
 
   //Include Rotary Knob Encoder states
-  // Shift in Rotary Encoder States
+  // Left shift 2 and insert Rotary Encoder States (2 bits)
   // val = (val << 2) | encoder4.getState();
   // val = (val << 2) | encoder3.getState();
   val = (val << 2) | encoder2.getState();
