@@ -36,13 +36,20 @@ SOFTWARE.
 #include "Config.h"
 #include "ShiftIn.h"    //https://github.com/InfectedBytes/ArduinoShiftIn
 #include "STM32_CAN.h"  //https://github.com/pazi88/STM32_CAN
+#include "Encoder.h"
 #include "Error_Handler.h"
 
 
 //(OpenFFBoard-main v1.2.4, Pins:CAN_RX=PD0 | CAN_TX=PD1, RX Buffer size = 8MB)
-STM32_CAN Can(CAN1, ALT_2, RX_SIZE_8, TX_SIZE_8);      //Use PD0/1 pins for CAN1 with RX/TX buffer 8MB
-ShiftIn<(SPI_BUTTON_BOARDS * 4)> shift;                //Init SPI ShiftIn instance with 4x 74HC165 = 32 inputs
-ErrorHandler error_handler(LED_RED_Pin,DEBUG_ENABLED); //Init Error handler (Serial Debugging & onboard RED LED)
+STM32_CAN Can(CAN1, ALT_2, RX_SIZE_8, TX_SIZE_8);        //Use PD0/1 pins for CAN1 with RX/TX buffer 8MB
+ShiftIn<(SPI_BUTTON_BOARDS * 4)> shift;                  //Init SPI ShiftIn instance with 4x 74HC165 = 32 inputs
+ErrorHandler error_handler(LED_RED_Pin, DEBUG_ENABLED);  //Init Error handler (Serial Debugging & onboard RED LED)
+
+//Rotary Knob Encoders
+Encoder encoder1(ENC1_A_PIN, ENC1_B_PIN, ENCODER_PULSE_MS);
+Encoder encoder2(ENC2_A_PIN, ENC2_B_PIN, ENCODER_PULSE_MS);
+
+
 
 /*###############################################*/
 /*#######              SETUP              #######*/
@@ -56,7 +63,7 @@ void setup() {
 
   //blinky blinky
   pinMode(LED_BLU_Pin, OUTPUT);
-//  pinMode(LED_RED_Pin, OUTPUT); //Moved to the error handler
+  //  pinMode(LED_RED_Pin, OUTPUT); //Moved to the error handler
   pinMode(LED_YEL_Pin, OUTPUT);
 
   // Initialize CAN bus
@@ -73,6 +80,11 @@ void setup() {
     shift.begin(SPI2_CS_PIN, SPI2_MISO_PIN, SPI2_SCK_PIN);
     FrameCount++;  //Single frame is used for up to 64 digital Buttons
   }
+
+  /* INITIALIZE ENCODERS*/
+  //(Supports up to 4 onboard Digital Inputs)
+  encoder1.begin();
+  encoder2.begin();
 
   /* INITIALIZE ANALOG INPUTS */
   if (ENABLED_ANALOG_AXIS_NUM > 0) {
@@ -106,10 +118,38 @@ void setup() {
 /*#######               LOOP              #######*/
 /*###############################################*/
 void loop() {
+
+  //update encoder states
+  encoder1.update();
+  encoder2.update();
+  // encoder3.update();
+  // encoder4.update();
+
+
+
   /*Input Polling Timer*/
   unsigned long currentMillis = millis();
   if (currentMillis - previousMillis >= CAN_Frame_interval) {
-    previousMillis = currentMillis;              //save last time polled.
+    previousMillis = currentMillis;  //save last time polled.
+
+    uint8_t enc1_dir = encoder1.getState();  //0000 0011
+    uint8_t enc2_dir = encoder2.getState();  //0000 1100
+
+    if (enc1_dir == 1 || enc2_dir == 1) {
+      digitalWrite(LED_RED_Pin, HIGH);
+      digitalWrite(LED_BLU_Pin, LOW);
+      digitalWrite(LED_YEL_Pin, LOW);
+    } else if (enc1_dir == 2 || enc2_dir == 2) {
+      digitalWrite(LED_BLU_Pin, HIGH);
+      digitalWrite(LED_RED_Pin, LOW);
+      digitalWrite(LED_YEL_Pin, LOW);
+    } else {
+      digitalWrite(LED_YEL_Pin, HIGH);
+      digitalWrite(LED_BLU_Pin, LOW);
+      digitalWrite(LED_RED_Pin, LOW);
+    }
+
+
     FrameIndex = (FrameIndex + 1) % FrameCount;  //Cycles through 0, 1, 2 (depending on how many frames needed)
 
     CAN_message_t CAN_Msg;
@@ -187,14 +227,16 @@ void loop() {
 
     //Just gonna send it!!! (https://www.youtube.com/watch?v=RSuLFvalhnQ)
     if (Can.write(CAN_Msg)) {
-      Serial.print("CAN ID: ");
-      Serial.print(CAN_Msg.id);
-      Serial.print(" | Data: |");
-      for (int i = 0; i < CAN_Msg.len; i++) {
-        Serial.print(CAN_Msg.buf[i], HEX);
-        Serial.print("|");
+      if (DEBUG_ENABLED) {
+        Serial.print("CAN ID: ");
+        Serial.print(CAN_Msg.id);
+        Serial.print(" | Data: |");
+        for (int i = 0; i < CAN_Msg.len; i++) {
+          Serial.print(CAN_Msg.buf[i], HEX);
+          Serial.print("|");
+        }
+        Serial.println("");
       }
-      Serial.println("");
     } else {
       error_handler.handleError(errorCode_CAN_Send_Fail);
     }
@@ -233,8 +275,17 @@ int16_t readAnalogInput(uint32_t ainPin) {
 template<uint8_t N>
 bool Append_BTN_States(CAN_message_t* _msg, ShiftIn<N>* _shift) {
   uint64_t val = _shift->read();  // Read button values as 64-bit integer
+
+  //Include Rotary Knob Encoder states
+  // Shift in Rotary Encoder States
+  // val = (val << 2) | encoder4.getState();
+  // val = (val << 2) | encoder3.getState();
+  val = (val << 2) | encoder2.getState();
+  val = (val << 2) | encoder1.getState();
+
   // Check to ensure the message buffer is empty and can fit 8 bytes
   if (_msg->len != 0) { return false; }
+
   for (int i = 0; i < 8; i++) {
     _msg->buf[i] = val & 0xFF;  // Extract the lowest byte
     val >>= 8;                  // Shift val right by 8 bits
@@ -242,8 +293,3 @@ bool Append_BTN_States(CAN_message_t* _msg, ShiftIn<N>* _shift) {
   }
   return true;
 }
-
-
-
-
-
