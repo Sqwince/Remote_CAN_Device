@@ -22,20 +22,19 @@ void ErrorHandler::handleError(ERROR_Code errorCode) {
   digitalWrite(_ledPin, HIGH);
 
   // Serial debugging
-  if (_debugEnabled){
+  if (_debugEnabled) {
     switch (errorCode) {
       case errorCode_Index_Fault:
         Serial.println("ERROR: INPUT number out of bounds.");
         break;
+
       case errorCode_CAN_Buf_Overflow:
         Serial.println("ERROR: CAN Buffer Overflow!!");
         break;
+
       case errorCode_CAN_Send_Fail:
         Serial.println("ERROR: Sending CAN frame failed.");
         break;
     }
   }
 }
-
-
-
