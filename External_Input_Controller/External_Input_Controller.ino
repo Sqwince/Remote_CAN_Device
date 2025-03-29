@@ -41,13 +41,19 @@ LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
 OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 SOFTWARE.
 */
+
 #include <Arduino.h>
 #include "Config.h"
-#include "ShiftIn.h"        //https://github.com/InfectedBytes/ArduinoShiftIn
-#include "STM32_CAN.h"      //https://github.com/pazi88/STM32_CAN
-#include "Encoder.h"        //https://chome.nerpa.tech/mcu/reading-rotary-encoder-on-arduino/
-#include "Error_Handler.h"  //Sqwince
+#include "ShiftIn.h"    //https://github.com/InfectedBytes/ArduinoShiftIn
+#include "STM32_CAN.h"  //https://github.com/pazi88/STM32_CAN
+#include "Encoder.h"    //https://chome.nerpa.tech/mcu/reading-rotary-encoder-on-arduino/
+#include "Error_Handler.h"
+#include "FastLED.h"  //Forked Repo to include STM32F407 support https://github.com/Sqwince/FastLED
 
+//Custom classes to replicate SimHub RGBLED strip effects (Sqwince)
+#include "RPMsEffect.h"
+#include "BlinkEffect.h"
+#include "ScrollEffect.h"
 
 //(OpenFFBoard-main v1.2.4, Pins:CAN_RX=PD0 | CAN_TX=PD1, RX Buffer size = 8MB)
 STM32_CAN Can(CAN1, ALT_2, RX_SIZE_8, TX_SIZE_8);        //Use PD0/1 pins for CAN1 with RX/TX buffer 8MB
@@ -59,28 +65,66 @@ Encoder encoder1(ENC1_A_PIN, ENC1_B_PIN, ENCODER_PULSE_MS);
 Encoder encoder2(ENC2_A_PIN, ENC2_B_PIN, ENCODER_PULSE_MS);
 
 
+/*#############################################################################*/
+/*############      SimHub RGBLED Strip Effect Replication      ###############*/
+/*      Sorry no fancy GUI. See: SimHub_Effects_Readme.h for other examples */
+/*#############################################################################*/
+CRGB leds[NUM_LEDS];  //Represents the LED strip as array of CRGB colors FastLED library
+
+/* Setup Simhub RGBLed Effects */
+// Map RPMs (0-100%) Left to right from LED#3 to #6 with a gradiant from Green to Red, with Revlimiter Red/Blue
+RPMsEffect RPMs_Left(leds, false, 3, 6, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Red, CRGB::Blue);
+
+// Map RPMs (0-100%) right to left from LED#9 to #14 with a gradiant from Green to Red, with Revlimiter Red/Blue
+RPMsEffect RPMs_Right(leds, true, 9, 6, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Blue, CRGB::Red);
+
+//Used for flags & spotter flags
+BlinkEffect yellowFlag1(leds, BlinkEffect::flashing, 0, 3, CRGB::Yellow, CRGB::Black);
+BlinkEffect yellowFlag2(leds, BlinkEffect::flashing, 15, 3, CRGB::Yellow, CRGB::Black);
+
+unsigned long LED_previousMillis = 0;                               //Last time LEDs updated
+const long LED_Refresh_interval = ((1 / LED_REFRESH_RATE) * 1000);  //Convert LED Refresh rate (Hz) to milliseconds
+
+
+//TODO: Remove this, used LED Testing
+#define POT_PIN AIN_1     //Potentiometer input to represent RPMs
+#define BUTTON_PIN DIN_7  //Push Button input for testing flags
+
+
 
 /*###############################################*/
 /*#######              SETUP              #######*/
 /*###############################################*/
 void setup() {
-// Initialize serial communication for debugging
+
+  //Configure OpenFFB Onboard LED pins
+  pinMode(LED_BLU_Pin, OUTPUT);
+  pinMode(LED_RED_Pin, OUTPUT);  //also established in the error handler
+  pinMode(LED_YEL_Pin, OUTPUT);
+
+
+  /* Initialize RGB LED Strip using FastLED Library */
+  FastLED.addLeds<WS2812B, LED_DATA_PIN, GRB>(leds, NUM_LEDS);
+  FastLED.setBrightness(MAX_BRIGHTNESS);  //set maximum brightness for the LEDs
+  FastLED.clear();                        //all to black
+  FastLED.show();                         //refresh strip
+
+
+/* Initialize serial communication for debugging */
 #if (DEBUG_ENABLED == true)
   Serial.begin(115200);
   Serial.println("Serial initialized.");
 #endif
 
-  //blinky blinky
-  pinMode(LED_BLU_Pin, OUTPUT);
-  //  pinMode(LED_RED_Pin, OUTPUT); //Moved to the error handler
-  pinMode(LED_YEL_Pin, OUTPUT);
 
-  // Initialize CAN bus
+  /* Initialize CAN bus */
   Can.begin();
   Can.setBaudRate(CAN_SPEED);
 #if (DEBUG_ENABLED == true)
   Serial.println("CAN initialized.");
 #endif
+
+
 
   /* INIIALIZE DIGITAL INPUTS */
   if ((SPI_BUTTON_BOARDS > 0) || (ROTARY_ENCODER_COUNT > 0)) {
@@ -90,10 +134,12 @@ void setup() {
     FrameCount++;  //Single frame is used for up to 64 digital Buttons
   }
 
+
   /* INITIALIZE ROTARY KNOB ENCODERS*/
   //(Supports up to 4 encoders read through onboard Digital Inputs 1-8)
   encoder1.begin();
   encoder2.begin();
+
 
   /* INITIALIZE ANALOG INPUTS */
   if (ENABLED_ANALOG_AXIS_NUM > 0) {
@@ -119,6 +165,14 @@ void setup() {
   /* Calculate Polling Timing */
   //Time between each CAN Frame in ms = (1/120Hz * 1000ms/sec) / (1,2,3)
   CAN_Frame_interval = (((1 / POLLING_FREQUENCY) * 1000) / (FrameCount));
+
+
+
+  //[OPTIONAL]Sets blinking rate for each effect
+  RPMs_Left.setBlinkDelay(100);    //RevLimiter Blink rate
+  RPMs_Right.setBlinkDelay(100);   //RevLimiter Blink Rate
+  yellowFlag1.setBlinkDelay(250);  //Flag Blink Rate
+  yellowFlag2.setBlinkDelay(250);  //Flag Blink Rate
 }
 
 
@@ -127,6 +181,7 @@ void setup() {
 /*#######               LOOP              #######*/
 /*###############################################*/
 void loop() {
+  unsigned long currentMillis = millis();
 
   //update encoder states
   encoder1.update();
@@ -134,11 +189,27 @@ void loop() {
   // encoder3.update();
   // encoder4.update();
 
- //Update RGBLEDs here:
+  //Timer for RGB Effects:
+  if (currentMillis - LED_previousMillis >= LED_Refresh_interval) {
+
+    //TODO: Remove input mapping, used for testing purposes only
+    uint16_t potValue = analogRead(AIN_4);                    //Left Joystick Y-Axis
+    uint16_t rpmPercentage = map(potValue, 0, 4075, 0, 100);  //Analog to % //lowered to 4075 for brownout reduction (s/b 4096)
+    bool state = digitalRead(DIN_7);                          //used to set flag for testing
+
+    //Update LED effects
+    RPMs_Left.update(rpmPercentage);
+    RPMs_Right.update(rpmPercentage);
+    yellowFlag1.update(state);
+    yellowFlag2.update(state);
+    
+    //Draw LEDS
+    FastLED.show();
+  }
 
 
-  /*Input Polling Timer*/
-  unsigned long currentMillis = millis();
+
+  /*Input HID Polling Timer*/
   if (currentMillis - previousMillis >= CAN_Frame_interval) {
     previousMillis = currentMillis;  //save last time polled.
 
