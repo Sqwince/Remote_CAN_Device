@@ -73,23 +73,24 @@ CRGB leds[NUM_LEDS];  //Represents the LED strip as array of CRGB colors FastLED
 
 /* Setup Simhub RGBLed Effects */
 // Map RPMs (0-100%) Left to right from LED#3 to #6 with a gradiant from Green to Red, with Revlimiter Red/Blue
-RPMsEffect RPMs_Left(leds, false, 3, 6, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Red, CRGB::Blue);
-
 // Map RPMs (0-100%) right to left from LED#9 to #14 with a gradiant from Green to Red, with Revlimiter Red/Blue
-RPMsEffect RPMs_Right(leds, true, 9, 6, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Blue, CRGB::Red);
+// RPMsEffect RPMs_Left(leds, false, 3, 6, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Red, CRGB::Blue);
+// RPMsEffect RPMs_Right(leds, true, 9, 6, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Blue, CRGB::Red);
 
 //Used for flags & spotter flags
-BlinkEffect yellowFlag1(leds, BlinkEffect::flashing, 0, 3, CRGB::Yellow, CRGB::Black);
-BlinkEffect yellowFlag2(leds, BlinkEffect::flashing, 15, 3, CRGB::Yellow, CRGB::Black);
+// BlinkEffect yellowFlag1(leds, BlinkEffect::flashing, 0, 3, CRGB::Yellow, CRGB::Black);
+// BlinkEffect yellowFlag2(leds, BlinkEffect::flashing, 15, 3, CRGB::Yellow, CRGB::Black);
 
-unsigned long LED_previousMillis = 0;                               //Last time LEDs updated
-const long LED_Refresh_interval = ((1 / LED_REFRESH_RATE) * 1000);  //Convert LED Refresh rate (Hz) to milliseconds
-
+//Just RPM no flags yet:
+RPMsEffect RPMs_Left(leds, false, 0, 9, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Red, CRGB::Black);
+RPMsEffect RPMs_Right(leds, true, 9, 9, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Black, CRGB::Red);
 
 //TODO: Remove this, used LED Testing
 #define POT_PIN AIN_1     //Potentiometer input to represent RPMs
 #define BUTTON_PIN DIN_7  //Push Button input for testing flags
 
+static CAN_message_t CAN_RX_msg;  //Incommming CAN msg from Simhub
+uint8_t RPM_percent = 0;          //Simhub reported RPM% (0-100)
 
 
 /*###############################################*/
@@ -108,11 +109,17 @@ void setup() {
   FastLED.setBrightness(MAX_BRIGHTNESS);  //set maximum brightness for the LEDs
   FastLED.clear();                        //all to black
   FastLED.show();                         //refresh strip
+  //[OPTIONAL]Sets blinking rate for each effect
+  RPMs_Left.setBlinkDelay(100);   //RevLimiter Blink rate
+  RPMs_Right.setBlinkDelay(100);  //RevLimiter Blink Rate
+  // yellowFlag1.setBlinkDelay(250);  //Flag Blink Rate
+  // yellowFlag2.setBlinkDelay(250);  //Flag Blink Rate
 
 
 /* Initialize serial communication for debugging */
 #if (DEBUG_ENABLED == true)
   Serial.begin(115200);
+  delay(2000);
   Serial.println("Serial initialized.");
 #endif
 
@@ -121,6 +128,7 @@ void setup() {
   Can.begin();
   Can.setBaudRate(CAN_SPEED);
 #if (DEBUG_ENABLED == true)
+  delay(2000);
   Serial.println("CAN initialized.");
 #endif
 
@@ -162,17 +170,10 @@ void setup() {
     }
   }
 
-  /* Calculate Polling Timing */
-  //Time between each CAN Frame in ms = (1/120Hz * 1000ms/sec) / (1,2,3)
+  /* Calculate Timing Intervals */
+  //Time between interval in ms = (1/__Hz * 1000ms/sec) / (1,2,3)
   CAN_Frame_interval = (((1 / POLLING_FREQUENCY) * 1000) / (FrameCount));
-
-
-
-  //[OPTIONAL]Sets blinking rate for each effect
-  RPMs_Left.setBlinkDelay(100);    //RevLimiter Blink rate
-  RPMs_Right.setBlinkDelay(100);   //RevLimiter Blink Rate
-  yellowFlag1.setBlinkDelay(250);  //Flag Blink Rate
-  yellowFlag2.setBlinkDelay(250);  //Flag Blink Rate
+  LED_Refresh_interval = ((1 / LED_REFRESH_RATE) * 1000);  //Convert LED Refresh rate (Hz) to milliseconds
 }
 
 
@@ -183,30 +184,51 @@ void setup() {
 void loop() {
   unsigned long currentMillis = millis();
 
+
   //update encoder states
   encoder1.update();
   encoder2.update();
   // encoder3.update();
   // encoder4.update();
 
-  //Timer for RGB Effects:
+
+
+
+  //Timer for SimHub MSG Handling / LED Drawing:
   if (currentMillis - LED_previousMillis >= LED_Refresh_interval) {
+    LED_previousMillis = currentMillis;  //save last time polled.
 
-    //TODO: Remove input mapping, used for testing purposes only
-    uint16_t potValue = analogRead(AIN_4);                    //Left Joystick Y-Axis
-    uint16_t rpmPercentage = map(potValue, 0, 4075, 0, 100);  //Analog to % //lowered to 4075 for brownout reduction (s/b 4096)
-    bool state = digitalRead(DIN_7);                          //used to set flag for testing
+    //Check for SimHub MSG:
+    if (Can.read(CAN_RX_msg)) {
 
-    //Update LED effects
-    RPMs_Left.update(rpmPercentage);
-    RPMs_Right.update(rpmPercentage);
-    yellowFlag1.update(!state);
-    yellowFlag2.update(!state);
-    
-    //Draw LEDS
-    FastLED.show();
+      RPM_percent = CAN_RX_msg.buf[0]; //first byte = rpm value 0-100%
+
+#if ((DEBUG_ENABLED == true) && (DEBUG_CANRX_MSGS == true))
+      Serial.print("<< CAN ID: ");
+      Serial.print(CAN_RX_msg.id);
+      Serial.print(" | Len: ");
+      Serial.print(CAN_RX_msg.len);
+      Serial.print(" | Data: ");
+      for (int i = 0; i < CAN_RX_msg.len; i++) {
+        Serial.print(CAN_RX_msg.buf[i], HEX);
+        Serial.print("|");
+      }
+      //Serial.println();
+      Serial.print(" Val: ");
+      Serial.println(RPM_percent);
+#endif
+    }
+
+    RPMs_Left.update(RPM_percent);
+    RPMs_Right.update(RPM_percent);
+    //yellowFlag1.update(!state);
+    //yellowFlag2.update(!state);
   }
 
+
+  //BUG: Seems to require the show outide of the timers to draw every loop cycle?
+  //Draw LEDS 
+  FastLED.show();
 
 
   /*Input HID Polling Timer*/
@@ -218,20 +240,7 @@ void loop() {
     // uint8_t enc3_dir = encoder3.getState();
     // uint8_t enc4_dir = encoder4.getState();
 
-    //Intended for troubleshooting feedback when debug is disabled (to be removed)
-    if (enc1_dir == 1 || enc2_dir == 1) {
-      digitalWrite(LED_RED_Pin, HIGH);
-      digitalWrite(LED_BLU_Pin, LOW);
-      digitalWrite(LED_YEL_Pin, LOW);
-    } else if (enc1_dir == 2 || enc2_dir == 2) {
-      digitalWrite(LED_BLU_Pin, HIGH);
-      digitalWrite(LED_RED_Pin, LOW);
-      digitalWrite(LED_YEL_Pin, LOW);
-    } else {
-      digitalWrite(LED_YEL_Pin, HIGH);
-      digitalWrite(LED_BLU_Pin, LOW);
-      digitalWrite(LED_RED_Pin, LOW);
-    }
+
 
     //Next Frame
     FrameIndex = (FrameIndex + 1) % FrameCount;  //Cycles through 0, 1, 2 (depending on how many frames needed)
@@ -245,8 +254,14 @@ void loop() {
       case digitalInputs:  // READ DIGITAL BUTTON DATA
         {
           if (DIGITAL_INPUTS_ENABLED) {
+            // CANID: 100
+            // Each bit = 1 digital I/O
+            // 32 of 64 possible mapped below in one CAN Frame:
+            //    |11111111|11111111|11111111|11111111|
+            //    |xxxxxxxx|xxxxxxxx|xxxxxxxx|xxxxxxxx|
+
             CAN_Msg.len = 0;
-            CAN_Msg.id = (CAN_DIGITAL_ID);
+            CAN_Msg.id = (CANID_DIGITAL);
 
             //Load Digital Inputs into CAN Buffer
             status = Append_BTN_States(&CAN_Msg, &shift);
@@ -264,8 +279,9 @@ void loop() {
       /*#######################################################################*/
       case AnalogAxis14:  //READ ANALOG AXIS 1:4 DATA
         {
+          // Frame ID: 110 -> |axis1[0:7], axis1[8:15]||axis2[0:7], axis2[8:15]||axis3[0:7], axis3[8:15]||axis4[0:7], axis4[8:15]||
           CAN_Msg.len = 0;
-          CAN_Msg.id = (CAN_AXIS14_ID);
+          CAN_Msg.id = (CANID_AXIS14);
 
           //Load ANALOG Inputs AXIS1:4 into CAN Buffer
           for (int i = 0; i < 4; i++) {
@@ -286,10 +302,11 @@ void loop() {
         }
 
       /*#######################################################################*/
-      case AnalogAxis56:  // READ ANALOG AXIS 1:4 DATA
+      case AnalogAxis56:  // READ ANALOG AXIS 5:6 DATA
         {
+          // Frame ID: 111 -> |axis5[0:7], axis5[8:15]||axis6[0:7], axis6[8:15]||xx||xx||xx||xx|
           CAN_Msg.len = 0;
-          CAN_Msg.id = (CAN_AXIS56_ID);
+          CAN_Msg.id = (CANID_AXIS56);
           //Load ANALOG Inputs AXIS5:6 into CAN Buffer
           for (int i = 4; i < 8; i++) {
 
@@ -309,34 +326,36 @@ void loop() {
           break;
         }
     }
-
-    /*#######################################################################*/
-    //Just gonna send it!!! (https://www.youtube.com/watch?v=RSuLFvalhnQ)
-    bool CAN_status = Can.write(CAN_Msg);
-
-    if (CAN_status) {
-      error_handler.clearError();
-
-#if ((DEBUG_ENABLED == true) && (DEBUG_CAN_MSGS == true))
-      Serial.print("CAN ID: ");
-      Serial.print(CAN_Msg.id);
-      Serial.print(" | Data: |");
-      for (int i = 0; i < CAN_Msg.len; i++) {
-        //Serial.print(CAN_Msg.buf[i], HEX);
-        Serial.printf("%02X", CAN_Msg.buf[i]);  //zero padded two places
-        Serial.print("|");
-      }
-      Serial.println("");
-#endif
-    } else {
-      error_handler.handleError(errorCode_CAN_Send_Fail);
-    }
-  }
-}
+    sendCANmsg(&CAN_Msg);  //Send the input statuses over CAN
+  }                        //polling timer
+}  //loop
 
 /*###############################################*/
 /*#######          HELPER FUNCTIONS       #######*/
 /*###############################################*/
+void sendCANmsg(CAN_message_t* msg) {
+  //You guys silly? I'm Just gonna send it!!! (https://www.youtube.com/watch?v=RSuLFvalhnQ)
+  bool CAN_status = Can.write(*msg);
+
+  if (!CAN_status) {
+    error_handler.handleError(errorCode_CAN_Send_Fail);
+  }
+
+  error_handler.clearError();
+
+#if ((DEBUG_ENABLED == true) && (DEBUG_CANTX_MSGS == true))
+  Serial.print("CAN ID: ");
+  Serial.print(msg->id);
+  Serial.print(" | Data: |");
+  for (int i = 0; i < msg->len; i++) {
+    //Serial.print(CAN_Msg.buf[i], HEX);
+    Serial.printf("%02X", msg->buf[i]);  //zero padded two places
+    Serial.print("|");
+  }
+  Serial.println("");
+#endif
+}
+
 
 /* Insert s16b value into CAN Msg Buffer */
 bool Append_s16(CAN_message_t* msg, int16_t val) {

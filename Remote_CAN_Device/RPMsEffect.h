@@ -77,7 +77,7 @@ private:
   //default effect (can be updated with functions later)
   uint16_t _blinkDelay = 100;  //blink delay for redline blink animation
   bool _useDimming = true;     //fade last LED
-  uint8_t _dimmingSteps = 8;   //Number of steps to use for dimming function
+  uint8_t _dimmingSteps = 16;   //Number of steps to use for dimming function
 
   //Redline Blink State Variables
   unsigned long _lastBlinkTime = 0;  // Last recorded blink time

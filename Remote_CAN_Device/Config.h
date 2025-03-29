@@ -46,41 +46,35 @@ enum FrameIndexNumber {
 };
 
 //TODO: Convert this to enum?
-uint32_t OpenFFB_Analog_Input_Pins[6] = {AIN_1,AIN_2,AIN_3,AIN_4,AIN_5,AIN_6};      
+uint32_t OpenFFB_Analog_Input_Pins[6] = { AIN_1, AIN_2, AIN_3, AIN_4, AIN_5, AIN_6 };
 
 
 
 /*#########################################*/
-/*#######   ANALOG INPUT SETTINGS   #######*/
+/*#######       CAN SETTINGS        #######*/
+/*#########################################*/
+
+//CAN IDs to TRANSMIT Inputs to HID:
+#define CANID_DIGITAL 100                // CAN Frame ID for Digital Input Data [Default: 100]
+#define CANID_AXIS14 110                 //CAN Frame ID for Analog Input Data Axis1:4 [Default: 110]
+#define CANID_AXIS56 (CANID_AXIS14 + 1)  //CAN Frame ID for Analog Input Data Axis5:6 [Default: 111]
+
+//CAN IDs to RECEIVE Game Data from Simhub:
+#define CANID_SIMHUB_RPM 200  //CAN ID of RPM Value received from SimHub custom serial protocol
+
+
+/*#########################################*/
+/*#######      INPUT SETTINGS       #######*/
 /*#########################################*/
 // HID expects signed integer range (MIN:-32767[0x7fff],CENTER:0[0x0000], MAX:+32767[0x8001])
-// Frame ID: 110 -> |axis1[0:7], axis1[8:15]||axis2[0:7], axis2[8:15]||axis3[0:7], axis3[8:15]||axis4[0:7], axis4[8:15]||
-// Frame ID: 111 -> |axis5[0:7], axis5[8:15]||axis6[0:7], axis6[8:15]||xx||xx||xx||xx|
-
 #define ENABLED_ANALOG_AXIS_NUM 4              //Number of analog inputs used (Range: 1-6)
-#define CAN_AXIS14_ID 110                      //CAN Frame ID for Analog Input Data Axis1:4 [Default: 110]
-#define CAN_AXIS56_ID (CAN_AXIS14_ID + 1)      //CAN Frame ID for Analog Input Data Axis5:6 [Default: 111]
 #define STM32_ADC_RESOLUTION 12                //Analog Input ADC Resolution (Default: 12 , STM32 ADC = 12-bit(0 to 4095)
 uint32_t analogPins[ENABLED_ANALOG_AXIS_NUM];  //array of pin#s for enabled analog axis
-
-
-/*##########################################*/
-/*#######   DIGITAL INPUT SETTINGS   #######*/
-/*##########################################*/
-// ID: 100
-// Each bit = 1 digital I/O
-// 32 of 64 possible mapped below in one CAN Frame:
-//    |11111111|11111111|11111111|11111111|
-//    |xxxxxxxx|xxxxxxxx|xxxxxxxx|xxxxxxxx|
-#define CAN_DIGITAL_ID 100   // CAN Frame ID for Digital Input Data [Default: 100]
-#define SPI_BUTTON_BOARDS 1  //Number of SPI-Button boards used (0-2)
-bool DIGITAL_INPUTS_ENABLED = false;
-
-
+#define SPI_BUTTON_BOARDS 1                    //Number of SPI-Button boards used (0-2)
 
 /*  ROTARY ENCODER KNOB SETTINGS
     A/B encoder phases attached to interrupts
-    converted into a pulse lasting for HID to read. 
+    converted into a pulse lasting #ms for HID to read. 
     Encoder Update Returns: -1 for CCW direction 
     Encoder Update Returns: +1 for CW direction
     Encoder Update Returns:  0 once pulse has timed out*/
@@ -90,15 +84,12 @@ bool DIGITAL_INPUTS_ENABLED = false;
 /*  ROTARY ENCODER KNOB #1 PINS */
 #define ENC1_A_PIN DIN_2
 #define ENC1_B_PIN DIN_4
-
 /*  ROTARY ENCODER KNOB #2 PINS */
 #define ENC2_A_PIN DIN_6
 #define ENC2_B_PIN DIN_8
-
 /*  ROTARY ENCODER KNOB #3 PINS */
 // #define ENC3_A_PIN DIN_1
 // #define ENC3_B_PIN DIN_3
-
 /*  ROTARY ENCODER KNOB #4 PINS */
 // #define ENC4_A_PIN DIN_5
 // #define ENC4_B_PIN DIN_7
@@ -107,25 +98,32 @@ bool DIGITAL_INPUTS_ENABLED = false;
 /*########################################################*/
 /*#######   General Settings & Timing Parameters   #######*/
 /*########################################################*/
-
-#define POLLING_FREQUENCY 500  //Input polling frequency [Default: 120Hz]
-#define CAN_SPEED 500000       //500 kbps for OpenFFBoard
-#define CAN_TXMSG_SIZE 8       //8 Bytes
-#define DEBUG_ENABLED false    //serial print Debug msgs
-#define DEBUG_CAN_MSGS false   //Serial print DATA sent over CAN
+#define POLLING_FREQUENCY 120   //Input polling frequency [Default: 120Hz]
+#define CAN_SPEED 500000        //500 kbps for OpenFFBoard
+#define CAN_TXMSG_SIZE 8        //8 Bytes
+#define DEBUG_ENABLED true      //serial print Debug msgs
+#define DEBUG_CANTX_MSGS false  //Serial print DATA sent over CAN
+#define DEBUG_CANRX_MSGS false  //Serial print DATA sent over CAN
 
 /* RGB LED Strip Settings */
-#define NUM_LEDS 18         //Total count of LEDs for strip
-#define LED_DATA_PIN PB15  //WS2812B Data Input
-#define LED_REFRESH_RATE 20     //RefreshRate [10 FPS]
-
+#define NUM_LEDS 18          //Total count of LEDs for strip
+#define LED_DATA_PIN PB15    //WS2812B Data Input
+#define LED_REFRESH_RATE 20  //RefreshRate [30 FPS]
+/*!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 /** CAUTION: Be mindful of LED current draw when setting MAX brightness **/
-#define MAX_BRIGHTNESS 20   //maximum brightness [0-255]     
+/*!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
+#define MAX_BRIGHTNESS 20  //maximum brightness [0-255]
 
 
-uint8_t CAN_Frame_interval = 8;    //Time in ms between sending CAN Frames
-uint8_t FrameCount = 0;            //Number of CAN Frames enabled
-uint8_t FrameIndex = 0;            // Keeps track of the current frame
-unsigned long previousMillis = 0;  //last time inputs were read
+
+uint16_t CAN_Frame_interval;           //Time in ms between sending CAN Frames
+uint16_t LED_Refresh_interval;         //Time in ms between updating LEDs
+uint16_t FrameCount;                   //Number of CAN Frames enabled
+uint8_t FrameIndex;                    // Keeps track of the current frame
+unsigned long previousMillis = 0;      //init last time inputs were read
+unsigned long LED_previousMillis = 0;  //init Last time LEDs updated
+bool DIGITAL_INPUTS_ENABLED;           //Set to true when SPI Button boards > 0
+
+
 
 #endif  // CONFIG_H
