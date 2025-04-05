@@ -35,6 +35,10 @@ void ErrorHandler::handleError(ERROR_Code errorCode) {
       case errorCode_CAN_Send_Fail:
         Serial.println("ERROR: Sending CAN frame failed.");
         break;
+
+        case errorCode_ENC_Init_Fail:
+        Serial.println("ERROR: Encoder initialization failed.");
+        break;
     }
   }
 }

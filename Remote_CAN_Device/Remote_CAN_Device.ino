@@ -1,69 +1,29 @@
-/*OpenFFboard External Input Controller
-========================================
-Description: Reads Analog & Digital inputs 
-and reports states over CAN to OpenFFBoard-Main
-which hosts the motor driver and provides a 
-single interface to the PC.
-
-Supports OpenFFB SPI Buttons,
- Analog Axis (joystick, pedals, etc),
- and up to 4 rotary knob encoders
-
-
-KNOWN ISSUE: Each Rotary encoder will consume 2 digital outputs from the SPI Buttons.
-Unable to map more than 32 outputs to HID for some reason at the moment even
-though the CAN digital frame supposedly supports up to 64 inputs.
-
-AUTHOR: Sqwince
-VERSION: 0.1
-
-LICENSE
---------
-The MIT License (MIT)
-
-Copyright© 2025 Sqwince
-
-Permission is hereby granted, free of charge, to any person obtaining a copy
-of this software and associated documentation files (the "Software"), to deal
-in the Software without restriction, including without limitation the rights
-to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
-copies of the Software, and to permit persons to whom the Software is
-furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all
-copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
-IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
-FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
-AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
-LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
-OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
-SOFTWARE.
-*/
-
 #include <Arduino.h>
-#include "Config.h"
-#include "ShiftIn.h"    //https://github.com/InfectedBytes/ArduinoShiftIn
-#include "STM32_CAN.h"  //https://github.com/pazi88/STM32_CAN
-#include "Encoder.h"    //https://chome.nerpa.tech/mcu/reading-rotary-encoder-on-arduino/
-#include "Error_Handler.h"
-#include "FastLED.h"  //Forked Repo to include STM32F407 support https://github.com/Sqwince/FastLED
+#include "OpenFFBoard_Pinouts.h"    //https://github.com/Ultrawipf/OpenFFBoard/wiki/Pinouts-and-peripherals)
+#include "Config.h"                 //Settings
+#include "src/lib/ShiftIn.h"        //https://github.com/InfectedBytes/ArduinoShiftIn
+#include "src/lib/STM32_CAN.h"      //https://github.com/pazi88/STM32_CAN
+#include "src/lib/Error_Handler.h"  //Debuggingt
+//#include "src/Encoders/Encoder.h"       //https://chome.nerpa.tech/mcu/reading-rotary-encoder-on-arduino/
+#include "src/Encoders/STM32HWEncoder.h"  // https://github.com/simplefoc/Arduino-FOC-drivers/tree/master/src/encoders/stm32hwencoder
+#include "FastLED.h"                      //Forked Repo to include STM32F407 support https://github.com/Sqwince/FastLED
 
 //Custom classes to replicate SimHub RGBLED strip effects (Sqwince)
-#include "RPMsEffect.h"
-#include "BlinkEffect.h"
-#include "ScrollEffect.h"
+#include "src\SimHub\RPMsEffect.h"
+#include "src\SimHub\BlinkEffect.h"
+#include "src\SimHub\ScrollEffect.h"
 
 //(OpenFFBoard-main v1.2.4, Pins:CAN_RX=PD0 | CAN_TX=PD1, RX Buffer size = 8MB)
 STM32_CAN Can(CAN1, ALT_2, RX_SIZE_8, TX_SIZE_8);        //Use PD0/1 pins for CAN1 with RX/TX buffer 8MB
 ShiftIn<(SPI_BUTTON_BOARDS * 4)> shift;                  //Init SPI ShiftIn instance with 4x 74HC165 = 32 inputs
-ErrorHandler error_handler(LED_RED_Pin, DEBUG_ENABLED);  //Init Error handler (Serial Debugging & onboard RED LED)
+ErrorHandler error_handler(LED_RED_PIN, DEBUG_ENABLED);  //Init Error handler (Serial Debugging & onboard RED LED)
 
 //Rotary Knob Encoders
-Encoder encoder1(ENC1_A_PIN, ENC1_B_PIN, ENCODER_PULSE_MS);
-Encoder encoder2(ENC2_A_PIN, ENC2_B_PIN, ENCODER_PULSE_MS);
-
+//Supports up to 4 encoders (See OpenFFBoard_Pinouts.h)
+// Encoder encoder1(ENC1_A_PIN, ENC1_B_PIN, ENCODER_PULSE_MS);
+// Encoder encoder2(ENC2_A_PIN, ENC2_B_PIN, ENCODER_PULSE_MS);
+STM32HWEncoder encoder1 = STM32HWEncoder(ENCODER_PPR, ENC1_A_PIN, ENC1_B_PIN);
+STM32HWEncoder encoder2 = STM32HWEncoder(ENCODER_PPR, ENC2_A_PIN, ENC2_B_PIN);
 
 /*#############################################################################*/
 /*############      SimHub RGBLED Strip Effect Replication      ###############*/
@@ -86,8 +46,8 @@ RPMsEffect RPMs_Left(leds, false, 0, 9, CRGB::Green, CRGB::Red, 0, 100, true, CR
 RPMsEffect RPMs_Right(leds, true, 9, 9, CRGB::Green, CRGB::Red, 0, 100, true, CRGB::Black, CRGB::Red);
 
 //TODO: Remove this, used LED Testing
-#define POT_PIN AIN_1     //Potentiometer input to represent RPMs
-#define BUTTON_PIN DIN_7  //Push Button input for testing flags
+#define POT_PIN AIN_1_PIN     //Potentiometer input to represent RPMs
+#define BUTTON_PIN DIN_7_PIN  //Push Button input for testing flags
 
 static CAN_message_t CAN_RX_msg;  //Incommming CAN msg from Simhub
 uint8_t RPM_percent = 0;          //Simhub reported RPM% (0-100)
@@ -99,9 +59,9 @@ uint8_t RPM_percent = 0;          //Simhub reported RPM% (0-100)
 void setup() {
 
   //Configure OpenFFB Onboard LED pins
-  pinMode(LED_BLU_Pin, OUTPUT);
-  pinMode(LED_RED_Pin, OUTPUT);  //also established in the error handler
-  pinMode(LED_YEL_Pin, OUTPUT);
+  pinMode(LED_BLU_PIN, OUTPUT);
+  pinMode(LED_RED_PIN, OUTPUT);  //also established in the error handler
+  pinMode(LED_YEL_PIN, OUTPUT);
 
 
   /* Initialize RGB LED Strip using FastLED Library */
@@ -120,16 +80,20 @@ void setup() {
 #if (DEBUG_ENABLED == true)
   Serial.begin(115200);
   delay(2000);
-  Serial.println("Serial initialized.");
+  Serial.println("Serial initialized Successfully!");
 #endif
 
 
-  /* Initialize CAN bus */
+
+/* Initialize CAN bus */
+#if (DEBUG_ENABLED == true)
+  Serial.println("Initializing CAN...");
+#endif
   Can.begin();
   Can.setBaudRate(CAN_SPEED);
 #if (DEBUG_ENABLED == true)
   delay(2000);
-  Serial.println("CAN initialized.");
+  Serial.println("CAN initialized Successfully!");
 #endif
 
 
@@ -138,15 +102,30 @@ void setup() {
   if ((SPI_BUTTON_BOARDS > 0) || (ROTARY_ENCODER_COUNT > 0)) {
     DIGITAL_INPUTS_ENABLED = true;
     //Initalize SPI port: pLoadPin, clockEnablePin, dataPin, clockPin
-    shift.begin(SPI2_CS_PIN, SPI2_MISO_PIN, SPI2_SCK_PIN);
+    shift.begin(SPI2_CS1_PIN, SPI2_MISO_PIN, SPI2_SCK_PIN);
     FrameCount++;  //Single frame is used for up to 64 digital Buttons
   }
 
 
   /* INITIALIZE ROTARY KNOB ENCODERS*/
-  //(Supports up to 4 encoders read through onboard Digital Inputs 1-8)
-  encoder1.begin();
-  encoder2.begin();
+#if (DEBUG_ENABLED == true)
+  Serial.println("Initializing Encoder...");
+#endif
+
+  // encoder1.begin(); //old lib - DELETE
+  // encoder2.begin(); //old lib - DELETE
+  encoder1.init();
+  encoder2.init();
+
+#if (DEBUG_ENABLED == true)
+  if ((encoder1.initialized == false) || (encoder2.initialized == false)) {
+    error_handler.handleError(errorCode_ENC_Init_Fail);
+  } else {
+    delay(1000);
+    Serial.println("Encoder initialized Successfully!");
+  }
+#endif
+
 
 
   /* INITIALIZE ANALOG INPUTS */
@@ -186,8 +165,8 @@ void loop() {
 
 
   //update encoder states
-  encoder1.update();
-  encoder2.update();
+  // encoder1.update();
+  // encoder2.update();
   // encoder3.update();
   // encoder4.update();
 
@@ -201,7 +180,7 @@ void loop() {
     //Check for SimHub MSG:
     if (Can.read(CAN_RX_msg)) {
 
-      RPM_percent = CAN_RX_msg.buf[0]; //first byte = rpm value 0-100%
+      RPM_percent = CAN_RX_msg.buf[0];  //first byte = rpm value 0-100%
 
 #if ((DEBUG_ENABLED == true) && (DEBUG_CANRX_MSGS == true))
       Serial.print("<< CAN ID: ");
@@ -227,7 +206,7 @@ void loop() {
 
 
   //BUG: Seems to require the show outide of the timers to draw every loop cycle?
-  //Draw LEDS 
+  //Draw LEDS
   FastLED.show();
 
 
@@ -235,8 +214,8 @@ void loop() {
   if (currentMillis - previousMillis >= CAN_Frame_interval) {
     previousMillis = currentMillis;  //save last time polled.
 
-    uint8_t enc1_dir = encoder1.getState();
-    uint8_t enc2_dir = encoder2.getState();
+    // uint8_t enc1_dir = encoder1.getState();
+    // uint8_t enc2_dir = encoder2.getState();
     // uint8_t enc3_dir = encoder3.getState();
     // uint8_t enc4_dir = encoder4.getState();
 
@@ -390,8 +369,8 @@ bool Append_BTN_States(CAN_message_t* _msg, ShiftIn<N>* _shift) {
   // Left shift 2 and insert Rotary Encoder States (2 bits)
   // val = (val << 2) | encoder4.getState();
   // val = (val << 2) | encoder3.getState();
-  val = (val << 2) | encoder2.getState();
-  val = (val << 2) | encoder1.getState();
+  // val = (val << 2) | encoder2.getState();
+  // val = (val << 2) | encoder1.getState();
 
   // Check to ensure the message buffer is empty and can fit 8 bytes
   if (_msg->len != 0) { return false; }

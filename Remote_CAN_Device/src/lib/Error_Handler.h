@@ -9,6 +9,7 @@ enum ERROR_Code {
   errorCode_Index_Fault,       //"ERROR: INPUT number out of bounds."
   errorCode_CAN_Buf_Overflow,  //"ERROR: CAN Buffer Overflow!!"
   errorCode_CAN_Send_Fail,     //"ERROR: Sending CAN frame failed."
+  errorCode_ENC_Init_Fail      //"ERROR: Encoder initialization failed."
 };
 
 
