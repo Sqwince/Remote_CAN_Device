@@ -1,3 +1,4 @@
+#include "wiring_time.h"
 #include "STM32HWEncoder.h"
 
 #if defined(_STM32_DEF_)
@@ -5,13 +6,47 @@
 /*
   Construtor HardwareEncoder(int ppr, PinA, PinB)
 */
-STM32HWEncoder::STM32HWEncoder(unsigned int _ppr, int8_t pinA, int8_t pinB) {
-  _lastCounter = 0; //initialize last counter
-  _dir = 0;        //initialize direction
-  cpr = _ppr * 4;  // 4x for quadrature
+STM32HWEncoder::STM32HWEncoder(unsigned int ppr, uint16_t pulse, int8_t pinA, int8_t pinB)
+  : _pulse(pulse) {
+  _lastCounter = 0;  //initialize last counter
+  _dir = 0;          //initialize direction
+  cpr = ppr * 4;     // 4x for quadrature
   _pinA = digitalPinToPinName(pinA);
   _pinB = digitalPinToPinName(pinB);
 }
+
+/*
+  Get Encoder Output State
+*/
+uint8_t STM32HWEncoder::Update() {
+
+  //WIP: IN PROGRESS left off here
+
+  uint32_t count = this->getSensorCount();  //get current encoder count
+  unsigned long currentMillis = millis();   //get current time
+
+  //Check if count has changed
+  if (count > _lastCounter) {         //Increasing
+    _dir = 1;                         //CW = 1 [0b01]
+    _lastCounter = count;             //
+  } else if (count < _lastCounter) {  //Decreasing
+    _dir = 2;                         //CCW = 2 [0b10]
+    _lastCounter = count;             //
+  }
+
+  //Change detected, timer to extend HID pulse
+  if (_dir != 3) {
+    if (currentMillis - _prevMillis >= _pulse) {
+      //timer expired
+      _prevMillis = currentMillis;  //record state change time
+      _dir = 3;                     //reset dir to end pulse 0b11 (inverted off)
+    }
+  }
+
+  return _dir;
+}
+
+
 
 
 /*

@@ -22,8 +22,8 @@ ErrorHandler error_handler(LED_RED_PIN, DEBUG_ENABLED);  //Init Error handler (S
 //Supports up to 4 encoders (See OpenFFBoard_Pinouts.h)
 // Encoder encoder1(ENC1_A_PIN, ENC1_B_PIN, ENCODER_PULSE_MS);
 // Encoder encoder2(ENC2_A_PIN, ENC2_B_PIN, ENCODER_PULSE_MS);
-STM32HWEncoder encoder1 = STM32HWEncoder(ENCODER_PPR, ENC1_A_PIN, ENC1_B_PIN);
-STM32HWEncoder encoder2 = STM32HWEncoder(ENCODER_PPR, ENC2_A_PIN, ENC2_B_PIN);
+STM32HWEncoder encoder1 = STM32HWEncoder(ENCODER_PPR, ENCODER_PULSE_MS, ENC1_A_PIN, ENC1_B_PIN);
+STM32HWEncoder encoder2 = STM32HWEncoder(ENCODER_PPR, ENCODER_PULSE_MS, ENC2_A_PIN, ENC2_B_PIN);
 
 /*#############################################################################*/
 /*############      SimHub RGBLED Strip Effect Replication      ###############*/
@@ -171,8 +171,6 @@ void loop() {
   // encoder4.update();
 
 
-
-
   //Timer for SimHub MSG Handling / LED Drawing:
   if (currentMillis - LED_previousMillis >= LED_Refresh_interval) {
     LED_previousMillis = currentMillis;  //save last time polled.
@@ -214,12 +212,11 @@ void loop() {
   if (currentMillis - previousMillis >= CAN_Frame_interval) {
     previousMillis = currentMillis;  //save last time polled.
 
+    //Old arduino interrupt based encoder lib - DELETE
     // uint8_t enc1_dir = encoder1.getState();
     // uint8_t enc2_dir = encoder2.getState();
     // uint8_t enc3_dir = encoder3.getState();
     // uint8_t enc4_dir = encoder4.getState();
-
-
 
     //Next Frame
     FrameIndex = (FrameIndex + 1) % FrameCount;  //Cycles through 0, 1, 2 (depending on how many frames needed)
@@ -265,7 +262,7 @@ void loop() {
           //Load ANALOG Inputs AXIS1:4 into CAN Buffer
           for (int i = 0; i < 4; i++) {
             if (i < ENABLED_ANALOG_AXIS_NUM) {
-              status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[i]));
+              status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[i], ANALOG_DEADZONE_LOWER, ANALOG_DEADZONE_UPPER));
             } else {
               size_t start_byte = CAN_Msg.len;   //pad frame with zeros
               status = Append_s16(&CAN_Msg, 0);  //TODO: Test without padding. (New Openffboard FW may render this OBE)
@@ -290,7 +287,7 @@ void loop() {
           for (int i = 4; i < 8; i++) {
 
             if (i < ENABLED_ANALOG_AXIS_NUM) {
-              status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[i]));
+              status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[i], 5.0, 95.0));
             } else {
               size_t start_byte = CAN_Msg.len;   //pad frame with zeros
               status = Append_s16(&CAN_Msg, 0);  //TODO: Test without padding. (New Openffboard FW may render this OBE)
@@ -347,17 +344,35 @@ bool Append_s16(CAN_message_t* msg, int16_t val) {
 }
 
 /*Read Analog Axis and re-map values for HID*/
-int16_t readAnalogInput(uint32_t ainPin) {
+int16_t readAnalogInput(uint32_t ainPin, float lowerDeadzonePercent, float upperDeadzonePercent) {
   int16_t val = (int16_t)analogRead(ainPin);
-  /* mapped_val=(input_value−in_min)× (out_max−out_min/in_max−in_min)+out_min
-    val = ((int32_t)val - in_min) * ((out_max - out_min) / (in_max - in_min)) + out_min;
+
+  // Convert percentage deadzones to raw 12b values
+  uint16_t lowerDeadzone = (uint16_t)(lowerDeadzonePercent * 4095.0 / 100.0);
+  uint16_t upperDeadzone = (uint16_t)(upperDeadzonePercent * 4095.0 / 100.0);
+
+  //LOWER analog deadzone
+  if (val <= lowerDeadzone) {
+    return -32767;
+  } else if (val >= upperDeadzone) {
+    return 32767;
+  } else {
+
+    /* Remap from [lowerDeadzone, upperDeadzone] to [-32767, 32767]
+       12bit uint (0 to 4095) MAP TO 16bit signed (-32767 to +32767) */
+    int32_t mapped_val = (int32_t)(val - lowerDeadzone) * 65534 / (upperDeadzone - lowerDeadzone) - 32767;
+    return (int16_t)mapped_val;
+
+    /* mapped_val = (input_value − in_min) * (out_max − out_min / in_max − in_min) + out_min
+              val = ((int32_t)val - in_min) * ((out_max - out_min) / (in_max - in_min)) + out_min;
     in_min = 0
     in_max = 4095
     out_min = -32767
     out_max = 32767  
   12bit uint (0 to 4095) MAP TO 16bit signed (-32767 to +32767)*/
-  val = ((int32_t)val * 65534 / 4095) - 32767;
-  return val;
+    // val = ((int32_t)val * 65534 / 4095) - 32767;
+    // return val;
+  }
 }
 
 /*Insert Button values into the CAN Msg Buffer*/
@@ -365,12 +380,30 @@ template<uint8_t N>
 bool Append_BTN_States(CAN_message_t* _msg, ShiftIn<N>* _shift) {
   uint64_t val = _shift->read();  // Read button values as 64-bit integer
 
+  //unsigned long currentMillis = millis();
+
+  uint8_t enc1_dir = encoder1.Update();
+  uint8_t enc2_dir = encoder2.Update();
+
+  /* ENCODERS */
   //Include Rotary Knob Encoder states
-  // Left shift 2 and insert Rotary Encoder States (2 bits)
-  // val = (val << 2) | encoder4.getState();
-  // val = (val << 2) | encoder3.getState();
-  // val = (val << 2) | encoder2.getState();
-  // val = (val << 2) | encoder1.getState();
+  // Left shift 2 and insert Rotary Encoder States (2 bits each)
+  // val = (val << 2) | encoder4.Update();
+  // val = (val << 2) | encoder3.Update();
+  // val = (val << 2) | encoder2.Update();
+  // val = (val << 2) | encoder1.Update();
+
+
+//encoder debugging
+#if ((DEBUG_ENABLED == true) && (DEBUG_ENCODERS == true))
+  //Debugging - Encoder Count Serial Reporting
+  Serial.print("Encoder 1|2: ");
+  Serial.print(enc1_dir, DEC);
+  Serial.print("|");
+  Serial.print(enc2_dir, DEC);
+  Serial.println("|");
+#endif
+
 
   // Check to ensure the message buffer is empty and can fit 8 bytes
   if (_msg->len != 0) { return false; }

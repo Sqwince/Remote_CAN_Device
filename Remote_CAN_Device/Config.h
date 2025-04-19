@@ -32,10 +32,13 @@ uint32_t OpenFFB_Analog_Input_Pins[6] = { AIN_1_PIN, AIN_2_PIN, AIN_3_PIN, AIN_4
 /*#######      INPUT SETTINGS       #######*/
 /*#########################################*/
 // HID expects signed integer range (MIN:-32767[0x7fff],CENTER:0[0x0000], MAX:+32767[0x8001])
-#define ENABLED_ANALOG_AXIS_NUM 4              //Number of analog inputs used (Range: 1-6)
-#define STM32_ADC_RESOLUTION 12                //Analog Input ADC Resolution (Default: 12 , STM32 ADC = 12-bit(0 to 4095)
-uint32_t analogPins[ENABLED_ANALOG_AXIS_NUM];  //array of pin#s for enabled analog axis
-#define SPI_BUTTON_BOARDS 1                    //Number of SPI-Button boards used (0-2)
+#define ENABLED_ANALOG_AXIS_NUM 4                          //Number of analog inputs used (Range: 1-6)
+#define STM32_ADC_RESOLUTION 12                            //Analog Input ADC Resolution (Default: 12 , STM32 ADC = 12-bit(0 to 4095)
+#define STM32_ADC_MAXVALUE (2 ^ STM32_ADC_RESOLUTION - 1)  //Max reading of analog axis
+#define ANALOG_DEADZONE_LOWER 5.0                          //Lower deadzone in percent (0-100%) for analog inputs (adjust to help filter out unwanted input noise)
+#define ANALOG_DEADZONE_UPPER 95.0                         //Upper deadzone in percent (0-100%) for analog inputs (adjust this if input doesn't reach full 100%)
+uint32_t analogPins[ENABLED_ANALOG_AXIS_NUM];              //array of pin#s for enabled analog axis
+#define SPI_BUTTON_BOARDS 1                                //Number of SPI-Button boards used (0-2)
 
 /*  ROTARY ENCODER KNOB SETTINGS
     A/B encoder phases attached to interrupts
@@ -43,7 +46,7 @@ uint32_t analogPins[ENABLED_ANALOG_AXIS_NUM];  //array of pin#s for enabled anal
     Encoder Update Returns: -1 for CCW direction 
     Encoder Update Returns: +1 for CW direction
     Encoder Update Returns:  0 once pulse has timed out*/
-#define ENCODER_PPR 20  //20ppr / 40cpr - KY-040 Style encoder    
+#define ENCODER_PPR 20          //20ppr / 40cpr - KY-040 Style encoder
 #define ROTARY_ENCODER_COUNT 2  //Number of Rotary Encoder knobs used (Supports up to 4)
 #define ENCODER_PULSE_MS 50     //Encoder Pulse length in milliseconds (default = 50ms)
 
@@ -57,11 +60,12 @@ uint32_t analogPins[ENABLED_ANALOG_AXIS_NUM];  //array of pin#s for enabled anal
 #define DEBUG_ENABLED true      //serial print Debug msgs
 #define DEBUG_CANTX_MSGS false  //Serial print DATA sent over CAN
 #define DEBUG_CANRX_MSGS false  //Serial print DATA sent over CAN
+#define DEBUG_ENCODERS false     //Serial prints ENCODER info for debugging
 
 /* RGB LED Strip Settings */
-#define NUM_LEDS 18          //Total count of LEDs for strip
-#define LED_DATA_PIN SPI2_MOSI_PIN    //WS2812B Data Input
-#define LED_REFRESH_RATE 20  //RefreshRate [30 FPS]
+#define NUM_LEDS 18                 //Total count of LEDs for strip
+#define LED_DATA_PIN SPI2_MOSI_PIN  //WS2812B Data Input
+#define LED_REFRESH_RATE 20         //RefreshRate [30 FPS]
 /*!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
 /** CAUTION: Be mindful of LED current draw when setting MAX brightness **/
 /*!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!!*/
