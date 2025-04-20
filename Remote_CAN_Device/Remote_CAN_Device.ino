@@ -20,10 +20,10 @@ ErrorHandler error_handler(LED_RED_PIN, DEBUG_ENABLED);  //Init Error handler (S
 
 //Rotary Knob Encoders
 //Supports up to 4 encoders (See OpenFFBoard_Pinouts.h)
-// Encoder encoder1(ENC1_A_PIN, ENC1_B_PIN, ENCODER_PULSE_MS);
-// Encoder encoder2(ENC2_A_PIN, ENC2_B_PIN, ENCODER_PULSE_MS);
 STM32HWEncoder encoder1 = STM32HWEncoder(ENCODER_PPR, ENCODER_PULSE_MS, ENC1_A_PIN, ENC1_B_PIN);
 STM32HWEncoder encoder2 = STM32HWEncoder(ENCODER_PPR, ENCODER_PULSE_MS, ENC2_A_PIN, ENC2_B_PIN);
+// STM32HWEncoder encoder3 = STM32HWEncoder(ENCODER_PPR, ENCODER_PULSE_MS, ENC3_A_PIN, ENC3_B_PIN);
+// STM32HWEncoder encoder4 = STM32HWEncoder(ENCODER_PPR, ENCODER_PULSE_MS, ENC4_A_PIN, ENC4_B_PIN);
 
 /*#############################################################################*/
 /*############      SimHub RGBLED Strip Effect Replication      ###############*/
@@ -112,10 +112,10 @@ void setup() {
   Serial.println("Initializing Encoder...");
 #endif
 
-  // encoder1.begin(); //old lib - DELETE
-  // encoder2.begin(); //old lib - DELETE
   encoder1.init();
   encoder2.init();
+  // encoder3.init();
+  // encoder4.init();
 
 #if (DEBUG_ENABLED == true)
   if ((encoder1.initialized == false) || (encoder2.initialized == false)) {
@@ -163,14 +163,6 @@ void setup() {
 void loop() {
   unsigned long currentMillis = millis();
 
-
-  //update encoder states
-  // encoder1.update();
-  // encoder2.update();
-  // encoder3.update();
-  // encoder4.update();
-
-
   //Timer for SimHub MSG Handling / LED Drawing:
   if (currentMillis - LED_previousMillis >= LED_Refresh_interval) {
     LED_previousMillis = currentMillis;  //save last time polled.
@@ -211,12 +203,6 @@ void loop() {
   /*Input HID Polling Timer*/
   if (currentMillis - previousMillis >= CAN_Frame_interval) {
     previousMillis = currentMillis;  //save last time polled.
-
-    //Old arduino interrupt based encoder lib - DELETE
-    // uint8_t enc1_dir = encoder1.getState();
-    // uint8_t enc2_dir = encoder2.getState();
-    // uint8_t enc3_dir = encoder3.getState();
-    // uint8_t enc4_dir = encoder4.getState();
 
     //Next Frame
     FrameIndex = (FrameIndex + 1) % FrameCount;  //Cycles through 0, 1, 2 (depending on how many frames needed)
@@ -262,7 +248,7 @@ void loop() {
           //Load ANALOG Inputs AXIS1:4 into CAN Buffer
           for (int i = 0; i < 4; i++) {
             if (i < ENABLED_ANALOG_AXIS_NUM) {
-              status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[i], ANALOG_DEADZONE_LOWER, ANALOG_DEADZONE_UPPER));
+              status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[i], ANALOG_DEADZONE_LOWER, ANALOG_DEADZONE_MIDDLE, ANALOG_DEADZONE_UPPER));
             } else {
               size_t start_byte = CAN_Msg.len;   //pad frame with zeros
               status = Append_s16(&CAN_Msg, 0);  //TODO: Test without padding. (New Openffboard FW may render this OBE)
@@ -287,7 +273,7 @@ void loop() {
           for (int i = 4; i < 8; i++) {
 
             if (i < ENABLED_ANALOG_AXIS_NUM) {
-              status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[i], 5.0, 95.0));
+              status = Append_s16(&CAN_Msg, readAnalogInput(analogPins[i], ANALOG_DEADZONE_LOWER, ANALOG_DEADZONE_MIDDLE, ANALOG_DEADZONE_UPPER));
             } else {
               size_t start_byte = CAN_Msg.len;   //pad frame with zeros
               status = Append_s16(&CAN_Msg, 0);  //TODO: Test without padding. (New Openffboard FW may render this OBE)
@@ -344,11 +330,12 @@ bool Append_s16(CAN_message_t* msg, int16_t val) {
 }
 
 /*Read Analog Axis and re-map values for HID*/
-int16_t readAnalogInput(uint32_t ainPin, float lowerDeadzonePercent, float upperDeadzonePercent) {
+int16_t readAnalogInput(uint32_t ainPin, float lowerDeadzonePercent, float midDeadzonePercent, float upperDeadzonePercent) {
   int16_t val = (int16_t)analogRead(ainPin);
 
   // Convert percentage deadzones to raw 12b values
   uint16_t lowerDeadzone = (uint16_t)(lowerDeadzonePercent * 4095.0 / 100.0);
+  uint16_t midDeadzone = (uint16_t)(midDeadzonePercent * 4095.0 / 100.0);
   uint16_t upperDeadzone = (uint16_t)(upperDeadzonePercent * 4095.0 / 100.0);
 
   //LOWER analog deadzone
@@ -361,6 +348,17 @@ int16_t readAnalogInput(uint32_t ainPin, float lowerDeadzonePercent, float upper
     /* Remap from [lowerDeadzone, upperDeadzone] to [-32767, 32767]
        12bit uint (0 to 4095) MAP TO 16bit signed (-32767 to +32767) */
     int32_t mapped_val = (int32_t)(val - lowerDeadzone) * 65534 / (upperDeadzone - lowerDeadzone) - 32767;
+    // Middle deadzone around 0 (optional)
+    if (midDeadzone > 0) {
+      if (mapped_val > -midDeadzone && mapped_val < midDeadzone) {
+        mapped_val = 0;
+      } else if (mapped_val <= -midDeadzone) {
+        mapped_val = (mapped_val + midDeadzone) * (32767.0 / (32767.0 - midDeadzone));
+      } else if (mapped_val >= midDeadzone) {
+        mapped_val = (mapped_val - midDeadzone) * (32767.0 / (32767.0 - midDeadzone));
+      }
+    }
+
     return (int16_t)mapped_val;
 
     /* mapped_val = (input_value − in_min) * (out_max − out_min / in_max − in_min) + out_min
@@ -380,19 +378,19 @@ template<uint8_t N>
 bool Append_BTN_States(CAN_message_t* _msg, ShiftIn<N>* _shift) {
   uint64_t val = _shift->read();  // Read button values as 64-bit integer
 
-  //unsigned long currentMillis = millis();
-
+  /* ENCODERS */
+  //Get encoder  states
   uint8_t enc1_dir = encoder1.Update();
   uint8_t enc2_dir = encoder2.Update();
+  // uint8_t enc3_dir = encoder3.Update();
+  // uint8_t enc4_dir = encoder4.Update();
 
-  /* ENCODERS */
-  //Include Rotary Knob Encoder states
+  //Shift in Rotary Knob Encoder states
   // Left shift 2 and insert Rotary Encoder States (2 bits each)
-  // val = (val << 2) | encoder4.Update();
-  // val = (val << 2) | encoder3.Update();
-  // val = (val << 2) | encoder2.Update();
-  // val = (val << 2) | encoder1.Update();
-
+  // val = (val << 2) | enc3_dir;
+  // val = (val << 2) | enc4_dir;
+  val = (val << 2) | enc2_dir;
+  val = (val << 2) | enc1_dir;
 
 //encoder debugging
 #if ((DEBUG_ENABLED == true) && (DEBUG_ENCODERS == true))
@@ -401,6 +399,10 @@ bool Append_BTN_States(CAN_message_t* _msg, ShiftIn<N>* _shift) {
   Serial.print(enc1_dir, DEC);
   Serial.print("|");
   Serial.print(enc2_dir, DEC);
+  // Serial.print("|");
+  // Serial.print(enc3_dir, DEC);
+  // Serial.print("|");
+  // Serial.print(enc4_dir, DEC);
   Serial.println("|");
 #endif
 

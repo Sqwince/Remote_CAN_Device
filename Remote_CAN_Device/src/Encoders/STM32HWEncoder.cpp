@@ -8,8 +8,9 @@
 */
 STM32HWEncoder::STM32HWEncoder(unsigned int ppr, uint16_t pulse, int8_t pinA, int8_t pinB)
   : _pulse(pulse) {
+    _prevMillis = 0; //initialize last time input was read
   _lastCounter = 0;  //initialize last counter
-  _dir = 0;          //initialize direction
+  _dir = 3;          //initialize direction
   cpr = ppr * 4;     // 4x for quadrature
   _pinA = digitalPinToPinName(pinA);
   _pinB = digitalPinToPinName(pinB);
@@ -26,12 +27,14 @@ uint8_t STM32HWEncoder::Update() {
   unsigned long currentMillis = millis();   //get current time
 
   //Check if count has changed
-  if (count > _lastCounter) {         //Increasing
+  if (count >= _lastCounter + 4) {         //Increasing
     _dir = 1;                         //CW = 1 [0b01]
     _lastCounter = count;             //
-  } else if (count < _lastCounter) {  //Decreasing
+    _prevMillis = currentMillis;      //record state change time
+  } else if (count <= _lastCounter - 4) {  //Decreasing
     _dir = 2;                         //CCW = 2 [0b10]
     _lastCounter = count;             //
+    _prevMillis = currentMillis;      //record state change time
   }
 
   //Change detected, timer to extend HID pulse

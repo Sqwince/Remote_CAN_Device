@@ -35,8 +35,9 @@ uint32_t OpenFFB_Analog_Input_Pins[6] = { AIN_1_PIN, AIN_2_PIN, AIN_3_PIN, AIN_4
 #define ENABLED_ANALOG_AXIS_NUM 4                          //Number of analog inputs used (Range: 1-6)
 #define STM32_ADC_RESOLUTION 12                            //Analog Input ADC Resolution (Default: 12 , STM32 ADC = 12-bit(0 to 4095)
 #define STM32_ADC_MAXVALUE (2 ^ STM32_ADC_RESOLUTION - 1)  //Max reading of analog axis
-#define ANALOG_DEADZONE_LOWER 5.0                          //Lower deadzone in percent (0-100%) for analog inputs (adjust to help filter out unwanted input noise)
-#define ANALOG_DEADZONE_UPPER 95.0                         //Upper deadzone in percent (0-100%) for analog inputs (adjust this if input doesn't reach full 100%)
+#define ANALOG_DEADZONE_LOWER 2.0                          //Lower deadzone in percent (0-100%) for analog inputs (adjust to help filter out unwanted input noise)
+#define ANALOG_DEADZONE_MIDDLE 16.0                         //Middle deadzone in percent (0-100%) around center to avoid noisy inputs
+#define ANALOG_DEADZONE_UPPER 98.0                         //Upper deadzone in percent (0-100%) for analog inputs (adjust this if input doesn't reach full 100%)
 uint32_t analogPins[ENABLED_ANALOG_AXIS_NUM];              //array of pin#s for enabled analog axis
 #define SPI_BUTTON_BOARDS 1                                //Number of SPI-Button boards used (0-2)
 
